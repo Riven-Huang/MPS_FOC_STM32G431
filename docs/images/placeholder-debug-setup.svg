@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900">
+  <rect width="1600" height="900" fill="#f8fbf7"/>
+  <rect x="56" y="56" width="1488" height="788" rx="28" ry="28" fill="#ffffff" stroke="#d7e5d9" stroke-width="4" stroke-dasharray="16 10"/>
+  <rect x="180" y="220" width="260" height="220" rx="20" ry="20" fill="#eef7f1" stroke="#6ca07b" stroke-width="4"/>
+  <rect x="670" y="220" width="260" height="220" rx="20" ry="20" fill="#eef7f1" stroke="#6ca07b" stroke-width="4"/>
+  <rect x="1160" y="220" width="260" height="220" rx="20" ry="20" fill="#eef7f1" stroke="#6ca07b" stroke-width="4"/>
+  <line x1="440" y1="330" x2="670" y2="330" stroke="#6ca07b" stroke-width="8"/>
+  <line x1="930" y1="330" x2="1160" y2="330" stroke="#6ca07b" stroke-width="8"/>
+  <text x="310" y="355" text-anchor="middle" font-family="Segoe UI, Microsoft YaHei, sans-serif" font-size="34" font-weight="700" fill="#245338">Power Supply</text>
+  <text x="800" y="355" text-anchor="middle" font-family="Segoe UI, Microsoft YaHei, sans-serif" font-size="34" font-weight="700" fill="#245338">FOC Board</text>
+  <text x="1290" y="355" text-anchor="middle" font-family="Segoe UI, Microsoft YaHei, sans-serif" font-size="34" font-weight="700" fill="#245338">Motor / Load</text>
+  <text x="800" y="690" text-anchor="middle" font-family="Segoe UI, Microsoft YaHei, sans-serif" font-size="52" font-weight="700" fill="#245338">TODO: Replace With Debug Setup Photo</text>
+  <text x="800" y="748" text-anchor="middle" font-family="Segoe UI, Microsoft YaHei, sans-serif" font-size="28" fill="#4d7a58">建议替换为电源、板卡、电机、调试器和串口连接的实拍图</text>
+</svg>
+

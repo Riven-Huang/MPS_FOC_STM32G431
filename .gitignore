@@ -1,0 +1,28 @@
+# Keil MDK build artifacts
+*.axf
+*.bin
+*.crf
+*.d
+*.dep
+*.hex
+*.htm
+*.iex
+*.lnp
+*.lst
+*.map
+*.o
+
+# Keil user-specific files
+*.uvguix.*
+*.uvoptx
+
+# Office temp files
+~$*
+
+# Optional build/log folders
+Objects/
+Listings/
+Debug/
+Release/
+build/
+Build/

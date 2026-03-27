@@ -1,0 +1,83 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="920" viewBox="0 0 1400 920">
+  <defs>
+    <style>
+      .title { font: 700 34px 'Segoe UI', 'Microsoft YaHei', sans-serif; fill: #17324f; }
+      .subtitle { font: 600 18px 'Segoe UI', 'Microsoft YaHei', sans-serif; fill: #4b6b8a; }
+      .boxA { fill: #ffffff; stroke: #2f5d8a; stroke-width: 3; rx: 18; ry: 18; }
+      .boxB { fill: #eef6ff; stroke: #7fa3c7; stroke-width: 3; rx: 18; ry: 18; }
+      .boxC { fill: #eef8f1; stroke: #3c8c5d; stroke-width: 3; rx: 18; ry: 18; }
+      .boxD { fill: #fff8eb; stroke: #c28a27; stroke-width: 3; rx: 18; ry: 18; }
+      .t1 { font: 700 24px 'Segoe UI', 'Microsoft YaHei', sans-serif; fill: #17324f; }
+      .t2 { font: 500 18px 'Segoe UI', 'Microsoft YaHei', sans-serif; fill: #4b6b8a; }
+      .arrow { stroke: #4b6b8a; stroke-width: 5; fill: none; marker-end: url(#a); }
+      .note { font: 500 16px 'Segoe UI', 'Microsoft YaHei', sans-serif; fill: #607d99; }
+    </style>
+    <marker id="a" markerWidth="12" markerHeight="12" refX="9" refY="6" orient="auto">
+      <path d="M0,0 L12,6 L0,12 Z" fill="#4b6b8a"/>
+    </marker>
+  </defs>
+
+  <rect width="1400" height="920" fill="#f7fbff"/>
+  <rect x="30" y="28" width="1340" height="864" rx="26" ry="26" fill="#ffffff" stroke="#d7e4ef" stroke-width="2"/>
+
+  <text x="70" y="82" class="title">FOC Control Flow</text>
+  <text x="70" y="114" class="subtitle">Current code path from ADC sampling to TIM1 duty update</text>
+
+  <rect x="110" y="160" width="280" height="110" class="boxA"/>
+  <text x="250" y="205" text-anchor="middle" class="t1">TIM1 PWM / TRGO2</text>
+  <text x="250" y="238" text-anchor="middle" class="t2">center-aligned carrier</text>
+
+  <rect x="510" y="160" width="280" height="110" class="boxA"/>
+  <text x="650" y="205" text-anchor="middle" class="t1">ADC1 Injected</text>
+  <text x="650" y="238" text-anchor="middle" class="t2">IA / IB / IC sampling</text>
+
+  <rect x="910" y="160" width="280" height="110" class="boxA"/>
+  <text x="1050" y="205" text-anchor="middle" class="t1">Offset + LPF</text>
+  <text x="1050" y="238" text-anchor="middle" class="t2">raw counts to current [A]</text>
+
+  <rect x="110" y="356" width="280" height="124" class="boxB"/>
+  <text x="250" y="402" text-anchor="middle" class="t1">MA600A + Observer</text>
+  <text x="250" y="435" text-anchor="middle" class="t2">angle, speed window,</text>
+  <text x="250" y="462" text-anchor="middle" class="t2">electrical angle</text>
+
+  <rect x="510" y="356" width="280" height="124" class="boxB"/>
+  <text x="650" y="402" text-anchor="middle" class="t1">Clarke / Park</text>
+  <text x="650" y="435" text-anchor="middle" class="t2">abc to alpha-beta to dq</text>
+  <text x="650" y="462" text-anchor="middle" class="t2">id / iq feedback</text>
+
+  <rect x="910" y="356" width="280" height="124" class="boxD"/>
+  <text x="1050" y="402" text-anchor="middle" class="t1">Position / Speed Loop</text>
+  <text x="1050" y="435" text-anchor="middle" class="t2">100 Hz position</text>
+  <text x="1050" y="462" text-anchor="middle" class="t2">observer-driven speed loop</text>
+
+  <rect x="300" y="576" width="340" height="124" class="boxC"/>
+  <text x="470" y="622" text-anchor="middle" class="t1">Current Loop / Voltage Mode</text>
+  <text x="470" y="655" text-anchor="middle" class="t2">10 kHz PI or manual ud / uq</text>
+  <text x="470" y="682" text-anchor="middle" class="t2">vector limit</text>
+
+  <rect x="760" y="576" width="340" height="124" class="boxC"/>
+  <text x="930" y="622" text-anchor="middle" class="t1">Inverse Park + SVPWM</text>
+  <text x="930" y="655" text-anchor="middle" class="t2">dq to alpha-beta</text>
+  <text x="930" y="682" text-anchor="middle" class="t2">duty_a / duty_b / duty_c</text>
+
+  <rect x="530" y="760" width="340" height="90" class="boxA"/>
+  <text x="700" y="812" text-anchor="middle" class="t1">TIM1 CCR Update + N_SLEEP</text>
+
+  <rect x="60" y="742" width="340" height="108" class="boxB"/>
+  <text x="230" y="786" text-anchor="middle" class="t1">TIM6 + ADC2 DMA Slow Path</text>
+  <text x="230" y="818" text-anchor="middle" class="t2">VBUS / NTC / telemetry / VOFA</text>
+
+  <path d="M390 215 L510 215" class="arrow"/>
+  <path d="M790 215 L910 215" class="arrow"/>
+  <path d="M250 270 L250 356" class="arrow"/>
+  <path d="M1050 270 L1050 356" class="arrow"/>
+  <path d="M390 418 L510 418" class="arrow"/>
+  <path d="M790 418 L910 418" class="arrow"/>
+  <path d="M1050 480 L1050 540 L470 540 L470 576" class="arrow"/>
+  <path d="M650 480 L650 540 L470 540" class="arrow"/>
+  <path d="M640 638 L760 638" class="arrow"/>
+  <path d="M930 700 L930 730 L700 730 L700 760" class="arrow"/>
+
+  <text x="70" y="884" class="note">Fast loop entry: HAL_ADCEx_InjectedConvCpltCallback() -> program_adc_injected_conv_cplt_callback()</text>
+</svg>
+

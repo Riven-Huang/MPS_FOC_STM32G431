@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900">
+  <rect width="1600" height="900" fill="#fbfaf6"/>
+  <rect x="56" y="56" width="1488" height="788" rx="28" ry="28" fill="#ffffff" stroke="#e6ddc8" stroke-width="4" stroke-dasharray="16 10"/>
+  <rect x="150" y="180" width="1300" height="420" rx="18" ry="18" fill="#fff9ec" stroke="#caa557" stroke-width="4"/>
+  <polyline points="190,440 290,430 390,420 490,460 590,300 690,520 790,340 890,470 990,260 1090,430 1190,380 1290,350 1390,410" fill="none" stroke="#d95f02" stroke-width="8"/>
+  <text x="800" y="720" text-anchor="middle" font-family="Segoe UI, Microsoft YaHei, sans-serif" font-size="52" font-weight="700" fill="#8b5a11">TODO: Replace With Oscilloscope / VOFA Waveform</text>
+  <text x="800" y="780" text-anchor="middle" font-family="Segoe UI, Microsoft YaHei, sans-serif" font-size="28" fill="#a06b1a">建议替换为相电流、速度响应、位置响应或启动波形截图</text>
+</svg>
+

@@ -1,0 +1,19 @@
+License: TBD
+
+This repository is intended for open-source release, but the final license has
+not been selected yet.
+
+Before publishing, replace this file with the final license text and update the
+README badge accordingly.
+
+Suggested decisions to make:
+
+1. Firmware source code license
+2. Hardware design files license
+3. Whether to use a single license or separate licenses for hardware/software
+
+Common options:
+
+- Firmware: MIT / Apache-2.0
+- Hardware: CERN-OHL-S / CERN-OHL-P
+

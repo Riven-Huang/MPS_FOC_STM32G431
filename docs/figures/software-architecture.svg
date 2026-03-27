@@ -1,0 +1,71 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="920" viewBox="0 0 1400 920">
+  <defs>
+    <style>
+      .title { font: 700 34px 'Segoe UI', 'Microsoft YaHei', sans-serif; fill: #17324f; }
+      .subtitle { font: 600 18px 'Segoe UI', 'Microsoft YaHei', sans-serif; fill: #4b6b8a; }
+      .boxCore { fill: #ffffff; stroke: #2f5d8a; stroke-width: 3; rx: 18; ry: 18; }
+      .boxApp { fill: #eef8f1; stroke: #3c8c5d; stroke-width: 3; rx: 18; ry: 18; }
+      .boxData { fill: #f5f7fb; stroke: #8ea5bd; stroke-width: 3; rx: 18; ry: 18; }
+      .boxDoc { fill: #fff8eb; stroke: #c28a27; stroke-width: 3; rx: 18; ry: 18; }
+      .t1 { font: 700 24px 'Segoe UI', 'Microsoft YaHei', sans-serif; fill: #17324f; }
+      .t2 { font: 500 18px 'Segoe UI', 'Microsoft YaHei', sans-serif; fill: #4b6b8a; }
+      .arrow { stroke: #4b6b8a; stroke-width: 5; fill: none; marker-end: url(#a); }
+    </style>
+    <marker id="a" markerWidth="12" markerHeight="12" refX="9" refY="6" orient="auto">
+      <path d="M0,0 L12,6 L0,12 Z" fill="#4b6b8a"/>
+    </marker>
+  </defs>
+
+  <rect width="1400" height="920" fill="#f7fbff"/>
+  <rect x="30" y="28" width="1340" height="864" rx="26" ry="26" fill="#ffffff" stroke="#d7e4ef" stroke-width="2"/>
+
+  <text x="70" y="82" class="title">Software Architecture</text>
+  <text x="70" y="114" class="subtitle">How the current repository is organized around the active control path</text>
+
+  <rect x="90" y="170" width="300" height="180" class="boxCore"/>
+  <text x="240" y="218" text-anchor="middle" class="t1">Core / HAL</text>
+  <text x="240" y="256" text-anchor="middle" class="t2">main.c</text>
+  <text x="240" y="286" text-anchor="middle" class="t2">adc.c / tim.c / spi.c</text>
+  <text x="240" y="316" text-anchor="middle" class="t2">usart.c / stm32g4xx_it.c</text>
+
+  <rect x="550" y="150" width="300" height="220" class="boxApp"/>
+  <text x="700" y="202" text-anchor="middle" class="t1">program.c</text>
+  <text x="700" y="238" text-anchor="middle" class="t2">active runtime center</text>
+  <text x="700" y="272" text-anchor="middle" class="t2">fast loop scheduling</text>
+  <text x="700" y="302" text-anchor="middle" class="t2">alignment / speed / current loop</text>
+  <text x="700" y="332" text-anchor="middle" class="t2">telemetry / protection</text>
+
+  <rect x="1010" y="170" width="300" height="180" class="boxApp"/>
+  <text x="1160" y="218" text-anchor="middle" class="t1">Algorithm Modules</text>
+  <text x="1160" y="256" text-anchor="middle" class="t2">foc_core.c</text>
+  <text x="1160" y="286" text-anchor="middle" class="t2">ma600a.c / filter.c</text>
+  <text x="1160" y="316" text-anchor="middle" class="t2">motor_params.h</text>
+
+  <rect x="170" y="500" width="300" height="200" class="boxData"/>
+  <text x="320" y="552" text-anchor="middle" class="t1">Runtime Data</text>
+  <text x="320" y="590" text-anchor="middle" class="t2">g_program_telemetry</text>
+  <text x="320" y="620" text-anchor="middle" class="t2">g_motor</text>
+  <text x="320" y="650" text-anchor="middle" class="t2">g_foc</text>
+  <text x="320" y="680" text-anchor="middle" class="t2">watch / tuning / VOFA</text>
+
+  <rect x="550" y="500" width="300" height="200" class="boxData"/>
+  <text x="700" y="552" text-anchor="middle" class="t1">Reusable / Legacy</text>
+  <text x="700" y="590" text-anchor="middle" class="t2">motor_state.c</text>
+  <text x="700" y="620" text-anchor="middle" class="t2">drv_pid.c</text>
+  <text x="700" y="650" text-anchor="middle" class="t2">present in repo</text>
+  <text x="700" y="680" text-anchor="middle" class="t2">not the active 10 kHz hot path</text>
+
+  <rect x="930" y="500" width="300" height="200" class="boxDoc"/>
+  <text x="1080" y="552" text-anchor="middle" class="t1">Docs / Assets</text>
+  <text x="1080" y="590" text-anchor="middle" class="t2">README.md</text>
+  <text x="1080" y="620" text-anchor="middle" class="t2">docs/quick-start.md</text>
+  <text x="1080" y="650" text-anchor="middle" class="t2">figures / images / experiment</text>
+
+  <path d="M390 260 L550 260" class="arrow"/>
+  <path d="M850 260 L1010 260" class="arrow"/>
+  <path d="M700 370 L700 500" class="arrow"/>
+  <path d="M640 370 L360 500" class="arrow"/>
+  <path d="M760 370 L1020 500" class="arrow"/>
+
+  <text x="70" y="884" font-family="Segoe UI, Microsoft YaHei, sans-serif" font-size="16" fill="#607d99">Key point: the active real-time control path is centered in program/App/program.c</text>
+</svg>
