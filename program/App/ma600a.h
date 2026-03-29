@@ -16,7 +16,11 @@ typedef struct
     float angle_deg;
     float angle_rad;
     uint8_t data_valid;
+    uint8_t transfer_busy;
+    uint8_t consecutive_bad_count;
     uint32_t sample_counter;
+    uint32_t reject_count;
+    uint32_t comm_error_count;
 } ma600a_t;
 
 /* 函数作用：初始化 MA600A 设备对象并绑定底层 SPI 与片选引脚。
@@ -35,7 +39,10 @@ void ma600a_init(ma600a_t *sensor, SPI_HandleTypeDef *hspi, GPIO_TypeDef *cs_por
  * 运行内容：在当前 CubeMX 配置的 16bit SPI 帧下发送 1 个空命令字，
  *      读取返回的 16bit 角度码，并同步换算成角度制与弧度制。
  */
-/* Called from the 10 kHz fast-loop ISR so the angle sample is used in the same cycle. */
+/* Called from the 10 kHz fast-loop ISR to kick the next SPI transfer. */
 uint8_t ma600a_read_angle(ma600a_t *sensor);
+
+void ma600a_spi_txrx_cplt_callback(ma600a_t *sensor, SPI_HandleTypeDef *hspi);
+void ma600a_spi_error_callback(ma600a_t *sensor, SPI_HandleTypeDef *hspi);
 
 #endif /* MA600A_H */

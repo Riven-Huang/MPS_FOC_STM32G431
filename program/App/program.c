@@ -22,30 +22,45 @@
 #define PROGRAM_FAST_LOOP_HZ                  10000.0f
 #define PROGRAM_FAST_LOOP_DT_S                (1.0f / PROGRAM_FAST_LOOP_HZ)
 #define PROGRAM_FAST_LOOP_PERIOD_US           (1000000.0f / PROGRAM_FAST_LOOP_HZ)
-#define PROGRAM_POSITION_LOOP_HZ              100.0f
+#define PROGRAM_POSITION_LOOP_HZ              200.0f
 #define PROGRAM_POSITION_LOOP_DT_S            (1.0f / PROGRAM_POSITION_LOOP_HZ)
 #define PROGRAM_SPEED_OBSERVER_WINDOW_SAMPLES 20U
 #define PROGRAM_DEFAULT_SPEED_MEAS_LPF_CUTOFF_HZ 150.0f
 #define PROGRAM_SPEED_LOOP_DT_S               (PROGRAM_FAST_LOOP_DT_S * (float)PROGRAM_SPEED_OBSERVER_WINDOW_SAMPLES)
 #define PROGRAM_ENCODER_LSB_RAD               (MOTOR_TWO_PI / 65536.0f)
-#define PROGRAM_SPEED_MEAS_ZERO_HOLD_SCALE    1.5f
-#define PROGRAM_CURRENT_MEAS_LPF_CUTOFF_HZ    5000.0f
+#define PROGRAM_SPEED_MEAS_ZERO_HOLD_SCALE    8.0f
+#define PROGRAM_SPEED_MEAS_ZERO_HOLD_MIN_MECH_RAD_S 0.35f
 #define PROGRAM_OPEN_LOOP_DEFAULT_SPEED_ELEC  2000.0f
 #define PROGRAM_OPEN_LOOP_DEFAULT_UD_V        0.0f
 #define PROGRAM_OPEN_LOOP_DEFAULT_UQ_V        1.0f
 #define PROGRAM_DEFAULT_SPEED_REF_MECH_RAD_S  (PROGRAM_OPEN_LOOP_DEFAULT_SPEED_ELEC / MOTOR_POLE_PAIRS)
-#define PROGRAM_DEFAULT_SPEED_KP              0.003f
-#define PROGRAM_DEFAULT_SPEED_KI              0.03f
-#define PROGRAM_DEFAULT_POSITION_KP           4.0f
+#define PROGRAM_DEFAULT_SPEED_KP              0.0015f
+#define PROGRAM_DEFAULT_SPEED_KI              0.015f
+#define PROGRAM_DEFAULT_POSITION_KP           3.0f
 #define PROGRAM_DEFAULT_POSITION_KI           0.0f
+#define PROGRAM_DEFAULT_POSITION_KD           0.0f
 #define PROGRAM_DEFAULT_POSITION_SPEED_LIMIT_MECH_RAD_S (PROGRAM_DEFAULT_SPEED_REF_MECH_RAD_S / MOTOR_GEAR_RATIO)
-#define PROGRAM_DEFAULT_IQ_LIMIT_A            8.00f
-#define PROGRAM_DEFAULT_CURRENT_KP            2.5761f
-#define PROGRAM_DEFAULT_CURRENT_KI            4555.31f
+#define PROGRAM_POSITION_MEAS_LPF_CUTOFF_HZ   12.0f
+#define PROGRAM_POSITION_HOLD_ERR_RAD         0.0040f
+#define PROGRAM_POSITION_HOLD_RELEASE_ERR_RAD 0.0150f
+#define PROGRAM_POSITION_HOLD_SPEED_MECH_RAD_S 0.50f
+#define PROGRAM_POSITION_HOLD_RELEASE_CONFIRM_CYCLES 20U
+#define PROGRAM_POSITION_CREEP_SPEED_MECH_RAD_S 0.10f
+#define PROGRAM_DEFAULT_IQ_LIMIT_A            12.00f
+/* Equivalent plant inferred from the legacy 1 kHz tuning:
+ * 1 kHz -> kp 2.5761, ki 4555.31
+ * 2 kHz -> kp 5.1522, ki 9110.62
+ * 3 kHz -> kp 7.7283, ki 13665.93 */
+#define PROGRAM_CURRENT_LOOP_EQ_RESISTANCE_OHM 0.7250f
+#define PROGRAM_CURRENT_LOOP_EQ_INDUCTANCE_H   0.0004100f
+#define PROGRAM_CURRENT_LOOP_BW_1KHZ_HZ        1000.0f
+#define PROGRAM_CURRENT_LOOP_BW_2KHZ_HZ        2000.0f
+#define PROGRAM_CURRENT_LOOP_BW_3KHZ_HZ        3000.0f
+#define PROGRAM_DEFAULT_CURRENT_LOOP_BANDWIDTH_HZ PROGRAM_CURRENT_LOOP_BW_1KHZ_HZ
 #define PROGRAM_CURRENT_REF_RAMP_A_PER_S      150.0f
 #define PROGRAM_VOLTAGE_LIMIT_RATIO           0.57735026919f
 #define PROGRAM_SPEED_REF_RAMP_RAD_S2         100.0f
-#define PROGRAM_ALIGN_UD_V                    1.2f
+#define PROGRAM_ALIGN_UD_V                    1.8f
 #define PROGRAM_ALIGN_HOLD_TICKS              8000U
 #define PROGRAM_ALIGN_SAMPLE_WINDOW_TICKS     512U
 #define PROGRAM_WAVE_PERIOD_MS                2U
@@ -63,9 +78,6 @@ foc_core_t g_foc;
 static ma600a_t g_ma600a;
 volatile program_telemetry_t g_program_telemetry;
 static filter_lpf_f32_t g_vbus_lpf;
-static filter_lpf_f32_t g_ia_meas_lpf;
-static filter_lpf_f32_t g_ib_meas_lpf;
-static filter_lpf_f32_t g_ic_meas_lpf;
 
 /* 慢速采样与后台调度状态：
  * ADC2 DMA 负责慢变量采样，TIM6 提供 1 ms 后台任务节拍。 */
@@ -102,12 +114,16 @@ static uint32_t g_encoder_align_sample_count = 0U;
 static float g_id_ref_applied_a = 0.0f;
 static float g_iq_ref_applied_a = 0.0f;
 static filter_lpf_f32_t g_speed_meas_lpf;
+static filter_lpf_f32_t g_position_meas_lpf;
 static float g_speed_loop_dt_s = PROGRAM_SPEED_LOOP_DT_S;
 static float g_position_loop_elapsed_s = 0.0f;
 static uint8_t g_dwt_cycle_counter_ready = 0U;
 static uint32_t g_fast_loop_period_cycles = 1U;
 static uint8_t g_position_loop_enable_prev = 0U;
+static uint8_t g_position_hold_active = 0U;
+static uint8_t g_position_hold_release_counter = 0U;
 static uint8_t g_current_loop_enable_prev = 1U;
+static float g_position_meas_output_continuous_rad = 0.0f;
 
 static float program_run_pi_f32(float ref,
                                 float feedback,
@@ -147,6 +163,35 @@ static float program_lpf_alpha_from_cutoff_hz(float cutoff_hz, float dt_s)
     return program_clamp_f32(alpha, 0.0f, 1.0f);
 }
 
+static float program_current_loop_kp_from_bandwidth_hz(float bandwidth_hz)
+{
+    if ((!isfinite(bandwidth_hz)) || (bandwidth_hz <= 0.0f)) {
+        return 0.0f;
+    }
+
+    return MOTOR_TWO_PI * bandwidth_hz * PROGRAM_CURRENT_LOOP_EQ_INDUCTANCE_H;
+}
+
+static float program_current_loop_ki_from_bandwidth_hz(float bandwidth_hz)
+{
+    if ((!isfinite(bandwidth_hz)) || (bandwidth_hz <= 0.0f)) {
+        return 0.0f;
+    }
+
+    return MOTOR_TWO_PI * bandwidth_hz * PROGRAM_CURRENT_LOOP_EQ_RESISTANCE_OHM;
+}
+
+static void program_update_control_angle_open_loop_state(void)
+{
+    if ((g_motor.control_angle_open_loop_enable == 0U) || (g_encoder_align_done == 0U)) {
+        return;
+    }
+
+    g_motor.theta_open_loop =
+        motor_params_wrap_angle_rad(g_motor.theta_open_loop +
+                                    (g_motor.control_angle_open_loop_speed_elec * PROGRAM_FAST_LOOP_DT_S));
+}
+
 /* 函数作用：把角度归一化到 0~2pi。
  * 输入：angle_rad。输出：返回归一化后的角度。调用频率：角度采样和测速处理中按需调用。运行内容：通过整圈折返保证角度始终落在单圈范围内。 */
 static float program_wrap_angle_0_2pi(float angle_rad)
@@ -180,6 +225,26 @@ static float program_wrap_delta_pm_pi(float angle_rad)
     return program_wrap_angle_0_2pi(angle_rad + PROGRAM_PI) - PROGRAM_PI;
 }
 
+static float program_wrap_angle_0_360_deg(float angle_deg)
+{
+    float turns;
+
+    if (!isfinite(angle_deg)) {
+        return 0.0f;
+    }
+
+    turns = floorf(angle_deg / 360.0f);
+    angle_deg -= turns * 360.0f;
+
+    if (angle_deg < 0.0f) {
+        angle_deg += 360.0f;
+    } else if (angle_deg >= 360.0f) {
+        angle_deg -= 360.0f;
+    }
+
+    return angle_deg;
+}
+
 /* 函数作用：估算编码器测速量化分辨率。
  * 输入：observer_window_samples 为测速窗口样本数。输出：返回对应的最小速度分辨率，单位 rad/s。调用频率：速度测量更新时调用。运行内容：按编码器 LSB 和测速窗口长度换算速度量化台阶。 */
 static float program_get_speed_quantization_rad_s(uint32_t observer_window_samples)
@@ -207,6 +272,9 @@ static float program_apply_speed_quantization_guard(float speed_mech_rad_s,
     if ((!isfinite(zero_hold_threshold_rad_s)) || (zero_hold_threshold_rad_s <= 0.0f)) {
         return speed_mech_rad_s;
     }
+    if (zero_hold_threshold_rad_s < PROGRAM_SPEED_MEAS_ZERO_HOLD_MIN_MECH_RAD_S) {
+        zero_hold_threshold_rad_s = PROGRAM_SPEED_MEAS_ZERO_HOLD_MIN_MECH_RAD_S;
+    }
 
     if ((fabsf(g_motor.speed_ref_mech_applied_rad_s) <= zero_hold_threshold_rad_s) &&
         (fabsf(speed_mech_rad_s) <= zero_hold_threshold_rad_s)) {
@@ -225,12 +293,11 @@ static float program_get_encoder_rotor_mech_angle_rad(void)
 
 /* 函数作用：获取输出轴机械角。
  * 输入：无。输出：返回输出轴单圈机械角，单位 rad。调用频率：位置环和调试遥测更新时调用。运行内容：优先使用连续机械角观测值，再按减速比折算回输出轴。 */
-static float program_get_encoder_output_mech_angle_rad(void)
+static float program_get_encoder_output_continuous_mech_angle_rad(void)
 {
     float rotor_mech_angle_rad;
-    float output_mech_angle_rad;
 
-    if ((g_encoder_speed_primed != 0U) && isfinite(g_encoder_continuous_mech_rad)) {
+    if (g_encoder_speed_primed != 0U) {
         rotor_mech_angle_rad = g_encoder_continuous_mech_rad;
     } else {
         rotor_mech_angle_rad = program_get_encoder_rotor_mech_angle_rad();
@@ -240,8 +307,12 @@ static float program_get_encoder_output_mech_angle_rad(void)
         return 0.0f;
     }
 
-    output_mech_angle_rad = rotor_mech_angle_rad / MOTOR_GEAR_RATIO;
-    return motor_params_wrap_angle_rad(output_mech_angle_rad);
+    return rotor_mech_angle_rad / MOTOR_GEAR_RATIO;
+}
+
+static float program_get_encoder_output_mech_angle_rad(void)
+{
+    return motor_params_wrap_angle_rad(program_get_encoder_output_continuous_mech_angle_rad());
 }
 
 /* 函数作用：获取未经零位补偿的原始电角度。
@@ -262,6 +333,9 @@ static float program_get_encoder_aligned_elec_angle_rad(void)
  * 输入：无。输出：返回控制电角度，单位 rad。调用频率：快环每次执行控制时调用。运行内容：集中封装控制角来源，便于后续切换角度来源。 */
 static float program_get_control_elec_angle_rad(void)
 {
+    if (g_motor.control_angle_open_loop_enable != 0U) {
+        return motor_params_wrap_angle_rad(g_motor.theta_open_loop);
+    }
     return program_get_encoder_aligned_elec_angle_rad();
 }
 
@@ -270,6 +344,24 @@ static float program_get_control_elec_angle_rad(void)
 static float program_rad_s_to_rpm(float speed_rad_s)
 {
     return speed_rad_s * (60.0f / MOTOR_TWO_PI);
+}
+
+static float program_rad_to_deg(float angle_rad)
+{
+    if (!isfinite(angle_rad)) {
+        return 0.0f;
+    }
+
+    return angle_rad * (360.0f / MOTOR_TWO_PI);
+}
+
+static float program_deg_to_rad(float angle_deg)
+{
+    if (!isfinite(angle_deg)) {
+        return 0.0f;
+    }
+
+    return angle_deg * (MOTOR_TWO_PI / 360.0f);
 }
 
 /* 函数作用：把转速从 rpm 转成 rad/s。
@@ -310,8 +402,17 @@ static void program_reset_speed_loop(void)
 static void program_reset_position_loop(void)
 {
     g_motor.position_integral_speed = 0.0f;
+    g_motor.position_error_mech_deg = 0.0f;
     g_motor.position_error_mech_rad = 0.0f;
     g_position_loop_elapsed_s = 0.0f;
+    g_position_hold_active = 0U;
+    g_position_hold_release_counter = 0U;
+    g_position_meas_output_continuous_rad = 0.0f;
+    filter_lpf_f32_init(&g_position_meas_lpf,
+                        program_lpf_alpha_from_cutoff_hz(PROGRAM_POSITION_MEAS_LPF_CUTOFF_HZ,
+                                                         PROGRAM_POSITION_LOOP_DT_S),
+                        0.0f);
+    g_position_meas_lpf.initialized = 0U;
 }
 
 /* 函数作用：复位速度参考斜坡。
@@ -381,9 +482,16 @@ static void program_reset_encoder_observer(void)
     g_encoder_speed_raw_mech_rad_s = 0.0f;
     g_motor.speed_meas_mech_rad_s = 0.0f;
     g_motor.speed_meas_elec_rad_s = 0.0f;
+    g_motor.position_meas_mech_deg = 0.0f;
     g_motor.position_meas_mech_rad = 0.0f;
     g_speed_loop_update_pending = 0U;
     g_speed_loop_dt_s = PROGRAM_SPEED_LOOP_DT_S;
+    g_position_meas_output_continuous_rad = 0.0f;
+    filter_lpf_f32_init(&g_position_meas_lpf,
+                        program_lpf_alpha_from_cutoff_hz(PROGRAM_POSITION_MEAS_LPF_CUTOFF_HZ,
+                                                         PROGRAM_POSITION_LOOP_DT_S),
+                        0.0f);
+    g_position_meas_lpf.initialized = 0U;
     filter_lpf_f32_init(&g_speed_meas_lpf,
                         program_lpf_alpha_from_cutoff_hz(g_motor.speed_meas_lpf_cutoff_hz,
                                                          PROGRAM_SPEED_LOOP_DT_S),
@@ -395,18 +503,25 @@ static void program_reset_encoder_observer(void)
 static void program_update_position_loop(float position_loop_dt_s)
 {
     float position_ref_wrapped_rad;
+    float position_meas_raw_output_continuous_rad;
     float position_meas_wrapped_rad;
     float position_error_wrapped_rad;
     float position_speed_limit_mech_rad_s;
     float position_speed_cmd_output_mech_rad_s;
+    float position_speed_meas_output_mech_rad_s;
+    float position_error_abs_rad;
+    float position_meas_filter_alpha;
+    float speed_meas_abs_rad_s;
 
     if ((g_motor.position_loop_enable == 0U) || (g_motor.speed_loop_enable == 0U)) {
+        g_motor.position_error_mech_deg = 0.0f;
         g_motor.position_error_mech_rad = 0.0f;
         return;
     }
 
     if (g_encoder_speed_primed == 0U) {
         g_motor.position_integral_speed = 0.0f;
+        g_motor.position_error_mech_deg = 0.0f;
         g_motor.position_error_mech_rad = 0.0f;
         g_motor.speed_ref_mech_rad_s = 0.0f;
         return;
@@ -416,14 +531,33 @@ static void program_update_position_loop(float position_loop_dt_s)
         position_loop_dt_s = PROGRAM_SPEED_LOOP_DT_S;
     }
 
-    position_ref_wrapped_rad = motor_params_wrap_angle_rad(g_motor.position_ref_mech_rad);
-    position_meas_wrapped_rad = program_get_encoder_output_mech_angle_rad();
-    if ((!isfinite(position_ref_wrapped_rad)) || (!isfinite(position_meas_wrapped_rad))) {
+    g_motor.position_ref_mech_deg = program_wrap_angle_0_360_deg(g_motor.position_ref_mech_deg);
+    position_ref_wrapped_rad = program_deg_to_rad(g_motor.position_ref_mech_deg);
+    position_meas_raw_output_continuous_rad = program_get_encoder_output_continuous_mech_angle_rad();
+    if ((!isfinite(position_ref_wrapped_rad)) || (!isfinite(position_meas_raw_output_continuous_rad))) {
         program_reset_position_loop();
         g_motor.speed_ref_mech_rad_s = 0.0f;
         return;
     }
 
+    position_meas_filter_alpha =
+        program_lpf_alpha_from_cutoff_hz(PROGRAM_POSITION_MEAS_LPF_CUTOFF_HZ, position_loop_dt_s);
+    g_position_meas_lpf.alpha = position_meas_filter_alpha;
+    if (g_position_meas_lpf.initialized == 0U) {
+        filter_lpf_f32_init(&g_position_meas_lpf,
+                            position_meas_filter_alpha,
+                            position_meas_raw_output_continuous_rad);
+    }
+
+    g_position_meas_output_continuous_rad =
+        filter_lpf_f32_update(&g_position_meas_lpf, position_meas_raw_output_continuous_rad);
+    if (!isfinite(g_position_meas_output_continuous_rad)) {
+        program_reset_position_loop();
+        g_motor.speed_ref_mech_rad_s = 0.0f;
+        return;
+    }
+
+    position_meas_wrapped_rad = motor_params_wrap_angle_rad(g_position_meas_output_continuous_rad);
     position_error_wrapped_rad = program_wrap_delta_pm_pi(position_ref_wrapped_rad - position_meas_wrapped_rad);
     if (!isfinite(position_error_wrapped_rad)) {
         program_reset_position_loop();
@@ -432,8 +566,48 @@ static void program_update_position_loop(float position_loop_dt_s)
     }
 
     g_motor.position_ref_mech_rad = position_ref_wrapped_rad;
+    g_motor.position_meas_mech_deg = program_wrap_angle_0_360_deg(program_rad_to_deg(position_meas_wrapped_rad));
     g_motor.position_meas_mech_rad = position_meas_wrapped_rad;
+    g_motor.position_error_mech_deg = program_rad_to_deg(position_error_wrapped_rad);
     g_motor.position_error_mech_rad = position_error_wrapped_rad;
+    position_error_abs_rad = fabsf(position_error_wrapped_rad);
+    position_speed_meas_output_mech_rad_s =
+        motor_params_rotor_speed_to_output_speed(g_motor.speed_meas_mech_rad_s);
+    speed_meas_abs_rad_s = fabsf(position_speed_meas_output_mech_rad_s);
+
+    if ((position_error_abs_rad <= PROGRAM_POSITION_HOLD_ERR_RAD) &&
+        (speed_meas_abs_rad_s <= PROGRAM_POSITION_HOLD_SPEED_MECH_RAD_S)) {
+        g_position_hold_active = 1U;
+        g_position_hold_release_counter = 0U;
+        g_motor.position_integral_speed = 0.0f;
+        g_motor.position_error_mech_deg = 0.0f;
+        g_motor.position_error_mech_rad = 0.0f;
+        g_motor.speed_ref_mech_rad_s = 0.0f;
+        return;
+    }
+
+    if (g_position_hold_active != 0U) {
+        if (position_error_abs_rad <= PROGRAM_POSITION_HOLD_RELEASE_ERR_RAD) {
+            g_position_hold_release_counter = 0U;
+            g_motor.position_integral_speed = 0.0f;
+            g_motor.position_error_mech_deg = 0.0f;
+            g_motor.position_error_mech_rad = 0.0f;
+            g_motor.speed_ref_mech_rad_s = 0.0f;
+            return;
+        }
+
+        g_position_hold_release_counter++;
+        if (g_position_hold_release_counter < PROGRAM_POSITION_HOLD_RELEASE_CONFIRM_CYCLES) {
+            g_motor.position_integral_speed = 0.0f;
+            g_motor.position_error_mech_deg = 0.0f;
+            g_motor.position_error_mech_rad = 0.0f;
+            g_motor.speed_ref_mech_rad_s = 0.0f;
+            return;
+        }
+
+        g_position_hold_active = 0U;
+        g_position_hold_release_counter = 0U;
+    }
 
     position_speed_limit_mech_rad_s = g_motor.position_speed_limit_mech_rad_s;
     if ((!isfinite(position_speed_limit_mech_rad_s)) || (position_speed_limit_mech_rad_s <= 0.0f)) {
@@ -448,6 +622,21 @@ static void program_update_position_loop(float position_loop_dt_s)
                                                               &g_motor.position_integral_speed,
                                                               -position_speed_limit_mech_rad_s,
                                                               position_speed_limit_mech_rad_s);
+    position_speed_cmd_output_mech_rad_s -=
+        g_motor.position_kd * position_speed_meas_output_mech_rad_s;
+    position_speed_cmd_output_mech_rad_s =
+        program_clamp_f32(position_speed_cmd_output_mech_rad_s,
+                          -position_speed_limit_mech_rad_s,
+                          position_speed_limit_mech_rad_s);
+
+    /* Without Ki, the command can become too small to overcome friction or the
+     * low-speed quantization guard. Keep a tiny crawl command outside hold. */
+    if ((position_error_abs_rad > PROGRAM_POSITION_HOLD_ERR_RAD) &&
+        (fabsf(position_speed_cmd_output_mech_rad_s) < PROGRAM_POSITION_CREEP_SPEED_MECH_RAD_S) &&
+        (speed_meas_abs_rad_s <= PROGRAM_POSITION_HOLD_SPEED_MECH_RAD_S)) {
+        position_speed_cmd_output_mech_rad_s =
+            copysignf(PROGRAM_POSITION_CREEP_SPEED_MECH_RAD_S, position_error_wrapped_rad);
+    }
 
     /* Position loop runs in output-shaft coordinates.
      * Convert output-shaft speed command to rotor mechanical speed for the speed loop. */
@@ -472,10 +661,21 @@ static void program_handle_position_loop_mode_switch(void)
 
     if (position_loop_enable_now != 0U) {
         if (g_encoder_speed_primed != 0U) {
-            g_motor.position_ref_mech_rad = program_get_encoder_output_mech_angle_rad();
-            g_motor.position_meas_mech_rad = g_motor.position_ref_mech_rad;
+            g_position_meas_output_continuous_rad = program_get_encoder_output_continuous_mech_angle_rad();
+            filter_lpf_f32_init(&g_position_meas_lpf,
+                                program_lpf_alpha_from_cutoff_hz(PROGRAM_POSITION_MEAS_LPF_CUTOFF_HZ,
+                                                                 PROGRAM_POSITION_LOOP_DT_S),
+                                g_position_meas_output_continuous_rad);
+            g_motor.position_meas_mech_rad =
+                motor_params_wrap_angle_rad(g_position_meas_output_continuous_rad);
+            g_motor.position_meas_mech_deg =
+                program_wrap_angle_0_360_deg(program_rad_to_deg(g_motor.position_meas_mech_rad));
+            g_motor.position_ref_mech_deg = g_motor.position_meas_mech_deg;
+            g_motor.position_ref_mech_rad = g_motor.position_meas_mech_rad;
         } else {
+            g_motor.position_ref_mech_deg = 0.0f;
             g_motor.position_ref_mech_rad = 0.0f;
+            g_motor.position_meas_mech_deg = 0.0f;
             g_motor.position_meas_mech_rad = 0.0f;
         }
     }
@@ -782,10 +982,14 @@ static void program_update_debug_telemetry(void)
     g_program_telemetry.control_state = (uint8_t)g_motor.state;
     g_program_telemetry.encoder_align_done = g_encoder_align_done;
     g_program_telemetry.ma600a_sample_counter = g_ma600a.sample_counter;
+    g_program_telemetry.ma600a_reject_count = g_ma600a.reject_count;
+    g_program_telemetry.ma600a_comm_error_count = g_ma600a.comm_error_count;
     g_program_telemetry.speed_observer_window_samples = PROGRAM_SPEED_OBSERVER_WINDOW_SAMPLES;
     g_program_telemetry.current_loop_enable = g_motor.current_loop_enable;
     g_program_telemetry.position_loop_enable = g_motor.position_loop_enable;
-    g_program_telemetry.theta_open_loop = g_foc.theta_elec;
+    g_program_telemetry.control_angle_open_loop_enable = g_motor.control_angle_open_loop_enable;
+    g_program_telemetry.theta_open_loop = g_motor.theta_open_loop;
+    g_program_telemetry.control_angle_open_loop_speed_elec = g_motor.control_angle_open_loop_speed_elec;
     g_program_telemetry.id_ref_cmd = g_motor.id_ref;
     g_program_telemetry.iq_ref_cmd = g_motor.iq_ref;
     g_program_telemetry.id_ref_applied_cmd = g_id_ref_applied_a;
@@ -807,6 +1011,10 @@ static void program_update_debug_telemetry(void)
     g_program_telemetry.position_ref_mech_rad = g_motor.position_ref_mech_rad;
     g_program_telemetry.position_meas_mech_rad = g_motor.position_meas_mech_rad;
     g_program_telemetry.position_error_mech_rad = g_motor.position_error_mech_rad;
+    g_program_telemetry.position_ref_mech_deg = g_motor.position_ref_mech_deg;
+    g_program_telemetry.position_meas_mech_deg = g_motor.position_meas_mech_deg;
+    g_program_telemetry.position_error_mech_deg = g_motor.position_error_mech_deg;
+    g_program_telemetry.position_kd = g_motor.position_kd;
     g_program_telemetry.speed_loop_dt_s = g_speed_loop_dt_s;
     g_program_telemetry.speed_meas_lpf_cutoff_hz = g_motor.speed_meas_lpf_cutoff_hz;
     g_program_telemetry.speed_ref_elec_rad_s = g_motor.speed_ref_elec_rad_s;
@@ -994,6 +1202,8 @@ static void program_update_speed_measurement(void)
     g_encoder_speed_window_sample_count += sample_delta_count;
     program_renormalize_encoder_observer();
     g_motor.position_meas_mech_rad = program_get_encoder_output_mech_angle_rad();
+    g_motor.position_meas_mech_deg =
+        program_wrap_angle_0_360_deg(program_rad_to_deg(g_motor.position_meas_mech_rad));
 
     if (g_encoder_speed_window_sample_count < PROGRAM_SPEED_OBSERVER_WINDOW_SAMPLES) {
         return;
@@ -1127,9 +1337,6 @@ static void program_update_current_feedback_from_raw(uint16_t ia_raw,
     float cos_theta;
 
     if (g_program_telemetry.current_offset_ready == 0U) {
-        filter_lpf_f32_init(&g_ia_meas_lpf, 1.0f, 0.0f);
-        filter_lpf_f32_init(&g_ib_meas_lpf, 1.0f, 0.0f);
-        filter_lpf_f32_init(&g_ic_meas_lpf, 1.0f, 0.0f);
         g_program_telemetry.ia = 0.0f;
         g_program_telemetry.ib = 0.0f;
         g_program_telemetry.ic = 0.0f;
@@ -1149,10 +1356,8 @@ static void program_update_current_feedback_from_raw(uint16_t ia_raw,
     ic_meas = PROGRAM_CURRENT_SIGN_IC *
               program_convert_current_from_raw(ic_raw, g_program_telemetry.ic_offset_raw);
 
-    ia_meas = filter_lpf_f32_update(&g_ia_meas_lpf, ia_meas);
-    ib_meas = filter_lpf_f32_update(&g_ib_meas_lpf, ib_meas);
-    ic_meas = filter_lpf_f32_update(&g_ic_meas_lpf, ic_meas);
-
+    /* Keep current feedback unfiltered in software so the current loop sees
+     * the freshest ADC sample after offset removal. */
     g_program_telemetry.ia = ia_meas;
     g_program_telemetry.ib = ib_meas;
     g_program_telemetry.ic_meas = ic_meas;
@@ -1270,6 +1475,8 @@ static void program_run_speed_current_control(void)
     program_handle_current_loop_mode_switch();
 
     if (g_motor.run_request == 0U) {
+        /* With run_request cleared the align branch is never reached, so the
+         * motor is left at zero vector and the power stage stays disabled. */
         program_set_power_stage_enable(0U);
         foc_core_reset_output(&g_foc);
         foc_core_set_electrical_angle(&g_foc, 0.0f);
@@ -1458,15 +1665,19 @@ static void program_update_encoder_measurements(void)
         g_program_telemetry.ma600a_angle_raw = g_ma600a.angle_raw;
         g_program_telemetry.ma600a_angle_deg = g_ma600a.angle_deg;
         g_program_telemetry.ma600a_angle_rad = g_ma600a.angle_rad;
-        if (g_encoder_align_done != 0U) {
-            g_program_telemetry.theta_elec = program_get_control_elec_angle_rad();
+        g_program_telemetry.ma600a_angle_valid = g_ma600a.data_valid;
+        g_program_telemetry.ma600a_consecutive_bad_count = g_ma600a.consecutive_bad_count;
+        program_update_speed_measurement();
+        if ((g_encoder_align_done != 0U) && (g_motor.control_angle_open_loop_enable != 0U)) {
+            g_program_telemetry.theta_elec = motor_params_wrap_angle_rad(g_motor.theta_open_loop);
+        } else if (g_encoder_align_done != 0U) {
+            g_program_telemetry.theta_elec = program_get_encoder_aligned_elec_angle_rad();
         } else {
             g_program_telemetry.theta_elec = program_get_encoder_raw_elec_angle_rad();
         }
-        g_program_telemetry.ma600a_angle_valid = g_ma600a.data_valid;
-        program_update_speed_measurement();
     } else {
         g_program_telemetry.ma600a_angle_valid = 0U;
+        g_program_telemetry.ma600a_consecutive_bad_count = g_ma600a.consecutive_bad_count;
         program_reset_encoder_observer();
         program_reset_encoder_alignment();
     }
@@ -1496,10 +1707,9 @@ static void program_send_wave_if_needed(uint32_t now_ms)
     }
 
     g_last_wave_tick_ms = now_ms;
-    wave_buf[0] = g_program_telemetry.speed_meas_raw_mech_rpm;
-    wave_buf[1] = g_program_telemetry.speed_meas_mech_rpm;
-    wave_buf[2] = g_program_telemetry.id;
-    wave_buf[3] = g_program_telemetry.iq;
+    wave_buf[0] = g_program_telemetry.speed_meas_mech_rpm;
+    wave_buf[1] = g_program_telemetry.position_meas_mech_deg;
+    wave_buf[2] = g_program_telemetry.position_meas_mech_rad;
     /* 当前发送协议改为 VOFA JustFloat 二进制浮点帧。 */
     (void)cli_uart_send_vofa(wave_buf, 4U);
 }
@@ -1530,6 +1740,7 @@ void program_init(void)
     g_motor.speed_loop_enable = 1U;
     g_motor.current_loop_enable = 1U;
     g_motor.position_loop_enable = 0U;
+    g_motor.control_angle_open_loop_enable = 0U;
     g_motor.theta_open_loop = 0.0f;
     g_motor.ud_ref = PROGRAM_OPEN_LOOP_DEFAULT_UD_V;
     g_motor.uq_ref = 0.0f;
@@ -1539,11 +1750,16 @@ void program_init(void)
     g_motor.speed_meas_mech_rad_s = 0.0f;
     g_motor.speed_ref_elec_rad_s = 0.0f;
     g_motor.speed_meas_elec_rad_s = 0.0f;
+    g_motor.control_angle_open_loop_speed_elec = PROGRAM_OPEN_LOOP_DEFAULT_SPEED_ELEC;
+    g_motor.position_ref_mech_deg = 0.0f;
     g_motor.position_ref_mech_rad = 0.0f;
+    g_motor.position_meas_mech_deg = 0.0f;
     g_motor.position_meas_mech_rad = 0.0f;
+    g_motor.position_error_mech_deg = 0.0f;
     g_motor.position_error_mech_rad = 0.0f;
     g_motor.position_kp = PROGRAM_DEFAULT_POSITION_KP;
     g_motor.position_ki = PROGRAM_DEFAULT_POSITION_KI;
+    g_motor.position_kd = PROGRAM_DEFAULT_POSITION_KD;
     g_motor.position_integral_speed = 0.0f;
     g_motor.position_speed_limit_mech_rad_s = PROGRAM_DEFAULT_POSITION_SPEED_LIMIT_MECH_RAD_S;
     g_motor.open_loop_speed_elec = 0.0f;
@@ -1553,8 +1769,8 @@ void program_init(void)
     g_motor.speed_integral_iq = 0.0f;
     g_motor.speed_integral_uq = 0.0f;
     g_motor.iq_limit = PROGRAM_DEFAULT_IQ_LIMIT_A;
-    g_motor.current_kp = PROGRAM_DEFAULT_CURRENT_KP;
-    g_motor.current_ki = PROGRAM_DEFAULT_CURRENT_KI;
+    g_motor.current_kp = program_current_loop_kp_from_bandwidth_hz(PROGRAM_DEFAULT_CURRENT_LOOP_BANDWIDTH_HZ);
+    g_motor.current_ki = program_current_loop_ki_from_bandwidth_hz(PROGRAM_DEFAULT_CURRENT_LOOP_BANDWIDTH_HZ);
     g_motor.id_integral_v = 0.0f;
     g_motor.iq_integral_v = 0.0f;
     g_motor.voltage_limit = 0.0f;
@@ -1566,18 +1782,6 @@ void program_init(void)
     program_reset_encoder_align_runtime();
     foc_core_set_electrical_angle(&g_foc, 0.0f);
     filter_lpf_f32_init(&g_vbus_lpf, 0.1f, PROGRAM_DEFAULT_VBUS_V);
-    filter_lpf_f32_init(&g_ia_meas_lpf,
-                        program_lpf_alpha_from_cutoff_hz(PROGRAM_CURRENT_MEAS_LPF_CUTOFF_HZ,
-                                                         PROGRAM_FAST_LOOP_DT_S),
-                        0.0f);
-    filter_lpf_f32_init(&g_ib_meas_lpf,
-                        program_lpf_alpha_from_cutoff_hz(PROGRAM_CURRENT_MEAS_LPF_CUTOFF_HZ,
-                                                         PROGRAM_FAST_LOOP_DT_S),
-                        0.0f);
-    filter_lpf_f32_init(&g_ic_meas_lpf,
-                        program_lpf_alpha_from_cutoff_hz(PROGRAM_CURRENT_MEAS_LPF_CUTOFF_HZ,
-                                                         PROGRAM_FAST_LOOP_DT_S),
-                        0.0f);
     cli_uart_init(&huart1);
     ma600a_init(&g_ma600a, &hspi1, ENC_CS_GPIO_Port, ENC_CS_Pin);
     program_init_cycle_counter();
@@ -1682,6 +1886,7 @@ void program_adc_injected_conv_cplt_callback(ADC_HandleTypeDef *hadc)
     /* Run MA600A scheduling from the 10 kHz injected ADC cadence. */
     (void)ma600a_read_angle(&g_ma600a);
     program_update_encoder_measurements();
+    program_update_control_angle_open_loop_state();
 
     if (g_encoder_align_done != 0U) {
         theta_feedback = program_get_control_elec_angle_rad();
@@ -1725,6 +1930,16 @@ void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef *hadc)
 void HAL_ADCEx_InjectedConvCpltCallback(ADC_HandleTypeDef *hadc)
 {
     program_adc_injected_conv_cplt_callback(hadc);
+}
+
+void HAL_SPI_TxRxCpltCallback(SPI_HandleTypeDef *hspi)
+{
+    ma600a_spi_txrx_cplt_callback(&g_ma600a, hspi);
+}
+
+void HAL_SPI_ErrorCallback(SPI_HandleTypeDef *hspi)
+{
+    ma600a_spi_error_callback(&g_ma600a, hspi);
 }
 
 /* 函数作用：获取当前程序层遥测对象。

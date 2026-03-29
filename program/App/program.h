@@ -28,13 +28,17 @@ typedef struct
     uint8_t speed_loop_ready;
     uint8_t current_loop_enable;
     uint8_t position_loop_enable;
+    uint8_t control_angle_open_loop_enable;
     uint8_t driver_fault_active;
     uint8_t ma600a_angle_valid;
+    uint8_t ma600a_consecutive_bad_count;
     uint8_t fast_loop_overrun;
     uint32_t fast_loop_overrun_count;
     uint32_t fast_loop_cycles;
     uint32_t fast_loop_cycles_max;
     uint32_t ma600a_sample_counter;
+    uint32_t ma600a_reject_count;
+    uint32_t ma600a_comm_error_count;
     uint32_t speed_observer_window_samples;
     float ia;
     float ib;
@@ -51,6 +55,7 @@ typedef struct
     float ma600a_angle_deg;
     float ma600a_angle_rad;
     float theta_open_loop;
+    float control_angle_open_loop_speed_elec;
     float id_ref_cmd;
     float iq_ref_cmd;
     float id_ref_applied_cmd;
@@ -70,6 +75,10 @@ typedef struct
     float position_ref_mech_rad;
     float position_meas_mech_rad;
     float position_error_mech_rad;
+    float position_ref_mech_deg;
+    float position_meas_mech_deg;
+    float position_error_mech_deg;
+    float position_kd;
     float speed_loop_dt_s;
     float speed_meas_lpf_cutoff_hz;
     float speed_ref_elec_rad_s;

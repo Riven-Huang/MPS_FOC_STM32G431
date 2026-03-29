@@ -1,8 +1,12 @@
 #include "ma600a.h"
 
-#define MA600A_FULL_SCALE_COUNTS 65536.0f
-#define MA600A_ANGLE_CMD         0x0000U
-#define MA600A_TWO_PI            6.28318530718f
+#define MA600A_FULL_SCALE_COUNTS_F         65536.0f
+#define MA600A_FULL_SCALE_COUNTS_U32       65536UL
+#define MA600A_HALF_SCALE_COUNTS           32768L
+#define MA600A_ANGLE_CMD                   0x0000U
+#define MA600A_TWO_PI                      6.28318530718f
+#define MA600A_MAX_JUMP_COUNTS             1024L
+#define MA600A_MAX_CONSECUTIVE_BAD_SAMPLES 4U
 
 /* 函数作用：把 MA600A 片选脚拉低，开始一次 SPI 帧传输。
  * 输入：sensor 为已完成初始化的 MA600A 设备对象。
@@ -35,10 +39,65 @@ static void ma600a_cs_high(const ma600a_t *sensor)
 static void ma600a_update_angle_cache(ma600a_t *sensor, uint16_t angle_raw)
 {
     sensor->angle_raw = angle_raw;
-    sensor->angle_deg = ((float)angle_raw * 360.0f) / MA600A_FULL_SCALE_COUNTS;
-    sensor->angle_rad = ((float)angle_raw * MA600A_TWO_PI) / MA600A_FULL_SCALE_COUNTS;
+    sensor->angle_deg = ((float)angle_raw * 360.0f) / MA600A_FULL_SCALE_COUNTS_F;
+    sensor->angle_rad = ((float)angle_raw * MA600A_TWO_PI) / MA600A_FULL_SCALE_COUNTS_F;
     sensor->data_valid = 1U;
+    sensor->consecutive_bad_count = 0U;
     sensor->sample_counter++;
+}
+
+static int32_t ma600a_delta_counts(uint16_t current_angle_raw, uint16_t previous_angle_raw)
+{
+    int32_t delta_counts;
+
+    delta_counts = (int32_t)current_angle_raw - (int32_t)previous_angle_raw;
+
+    if (delta_counts > MA600A_HALF_SCALE_COUNTS) {
+        delta_counts -= (int32_t)MA600A_FULL_SCALE_COUNTS_U32;
+    } else if (delta_counts < -MA600A_HALF_SCALE_COUNTS) {
+        delta_counts += (int32_t)MA600A_FULL_SCALE_COUNTS_U32;
+    }
+
+    return delta_counts;
+}
+
+static uint8_t ma600a_sample_is_plausible(const ma600a_t *sensor, uint16_t angle_raw)
+{
+    int32_t delta_counts;
+
+    if ((sensor == 0) || (sensor->data_valid == 0U) || (sensor->sample_counter == 0U)) {
+        return 1U;
+    }
+
+    delta_counts = ma600a_delta_counts(angle_raw, sensor->angle_raw);
+    if ((delta_counts > MA600A_MAX_JUMP_COUNTS) || (delta_counts < -MA600A_MAX_JUMP_COUNTS)) {
+        return 0U;
+    }
+
+    return 1U;
+}
+
+static void ma600a_note_bad_sample(ma600a_t *sensor, uint8_t comm_error)
+{
+    if (sensor == 0) {
+        return;
+    }
+
+    sensor->rx_word = 0U;
+
+    if (comm_error != 0U) {
+        sensor->comm_error_count++;
+    } else {
+        sensor->reject_count++;
+    }
+
+    if (sensor->consecutive_bad_count < UINT8_MAX) {
+        sensor->consecutive_bad_count++;
+    }
+
+    if (sensor->consecutive_bad_count >= MA600A_MAX_CONSECUTIVE_BAD_SAMPLES) {
+        sensor->data_valid = 0U;
+    }
 }
 
 /* 函数作用：复位一次 MA600A 读数状态。
@@ -47,6 +106,8 @@ static void ma600a_reset_state(ma600a_t *sensor)
 {
     sensor->rx_word = 0U;
     sensor->data_valid = 0U;
+    sensor->transfer_busy = 0U;
+    sensor->consecutive_bad_count = 0U;
 }
 
 /* 函数作用：初始化 MA600A 设备对象并绑定底层 SPI 与片选引脚。
@@ -70,7 +131,11 @@ void ma600a_init(ma600a_t *sensor, SPI_HandleTypeDef *hspi, GPIO_TypeDef *cs_por
     sensor->angle_raw = 0U;
     sensor->angle_deg = 0.0f;
     sensor->angle_rad = 0.0f;
+    sensor->transfer_busy = 0U;
+    sensor->consecutive_bad_count = 0U;
     sensor->sample_counter = 0U;
+    sensor->reject_count = 0U;
+    sensor->comm_error_count = 0U;
     ma600a_reset_state(sensor);
 
     ma600a_cs_high(sensor);
@@ -83,7 +148,6 @@ void ma600a_init(ma600a_t *sensor, SPI_HandleTypeDef *hspi, GPIO_TypeDef *cs_por
  * 运行内容：在当前 CubeMX 配置的 16bit SPI 帧下发送 1 个空命令字，
  *      读取返回的 16bit 角度码，并同步换算成角度制与弧度制。
  */
-/* Blocking SPI read: used in the 10 kHz fast loop for same-cycle angle feedback. */
 uint8_t ma600a_read_angle(ma600a_t *sensor)
 {
     HAL_StatusTypeDef status;
@@ -92,22 +156,55 @@ uint8_t ma600a_read_angle(ma600a_t *sensor)
         return 0U;
     }
 
+    if (sensor->transfer_busy != 0U) {
+        return 0U;
+    }
+
     sensor->tx_word = MA600A_ANGLE_CMD;
     sensor->rx_word = 0U;
 
     ma600a_cs_low(sensor);
-    status = HAL_SPI_TransmitReceive(sensor->hspi,
-                                     (uint8_t *)&sensor->tx_word,
-                                     (uint8_t *)&sensor->rx_word,
-                                     1U,
-                                     1U);
-    ma600a_cs_high(sensor);
+    status = HAL_SPI_TransmitReceive_IT(sensor->hspi,
+                                        (uint8_t *)&sensor->tx_word,
+                                        (uint8_t *)&sensor->rx_word,
+                                        1U);
 
     if (status != HAL_OK) {
-        ma600a_reset_state(sensor);
+        ma600a_cs_high(sensor);
+        if (status != HAL_BUSY) {
+            ma600a_note_bad_sample(sensor, 1U);
+        }
         return 0U;
     }
 
-    ma600a_update_angle_cache(sensor, sensor->rx_word);
+    sensor->transfer_busy = 1U;
     return 1U;
+}
+
+void ma600a_spi_txrx_cplt_callback(ma600a_t *sensor, SPI_HandleTypeDef *hspi)
+{
+    if ((sensor == 0) || (hspi == 0) || (sensor->hspi != hspi)) {
+        return;
+    }
+
+    ma600a_cs_high(sensor);
+    sensor->transfer_busy = 0U;
+
+    if (ma600a_sample_is_plausible(sensor, sensor->rx_word) == 0U) {
+        ma600a_note_bad_sample(sensor, 0U);
+        return;
+    }
+
+    ma600a_update_angle_cache(sensor, sensor->rx_word);
+}
+
+void ma600a_spi_error_callback(ma600a_t *sensor, SPI_HandleTypeDef *hspi)
+{
+    if ((sensor == 0) || (hspi == 0) || (sensor->hspi != hspi)) {
+        return;
+    }
+
+    ma600a_cs_high(sensor);
+    sensor->transfer_busy = 0U;
+    ma600a_note_bad_sample(sensor, 1U);
 }
