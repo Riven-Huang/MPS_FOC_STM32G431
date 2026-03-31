@@ -45,6 +45,7 @@
 #define PROGRAM_POSITION_HOLD_RELEASE_ERR_RAD 0.0150f
 #define PROGRAM_POSITION_HOLD_SPEED_MECH_RAD_S 0.50f
 #define PROGRAM_POSITION_HOLD_RELEASE_CONFIRM_CYCLES 20U
+#define PROGRAM_POSITION_CREEP_ENABLE_ERR_RAD 0.0300f
 #define PROGRAM_POSITION_CREEP_SPEED_MECH_RAD_S 0.10f
 #define PROGRAM_DEFAULT_IQ_LIMIT_A            12.00f
 /* Equivalent plant inferred from the legacy 1 kHz tuning:
@@ -631,7 +632,7 @@ static void program_update_position_loop(float position_loop_dt_s)
 
     /* Without Ki, the command can become too small to overcome friction or the
      * low-speed quantization guard. Keep a tiny crawl command outside hold. */
-    if ((position_error_abs_rad > PROGRAM_POSITION_HOLD_ERR_RAD) &&
+    if ((position_error_abs_rad > PROGRAM_POSITION_CREEP_ENABLE_ERR_RAD) &&
         (fabsf(position_speed_cmd_output_mech_rad_s) < PROGRAM_POSITION_CREEP_SPEED_MECH_RAD_S) &&
         (speed_meas_abs_rad_s <= PROGRAM_POSITION_HOLD_SPEED_MECH_RAD_S)) {
         position_speed_cmd_output_mech_rad_s =
