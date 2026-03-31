@@ -2,6 +2,8 @@
 
 审查日期: 2026-03-25
 
+> 注：本文是 `2026-03-25` 当日的调参快照，里面提到的默认参数仅对应当时版本。当前主分支的现行默认值请以 [`program/App/program.c`](../program/App/program.c)、[`README.md`](../README.md) 和 [`docs/quick-start.md`](./quick-start.md) 为准。
+
 ## 1. 这次改了什么
 
 这次没有改换相角主链，也没有改电流环 PI 主结构，重点只放在速度观测和速度环入口上。

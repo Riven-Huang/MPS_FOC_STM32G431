@@ -56,7 +56,7 @@
 - `g_motor.ud_ref`
 - `g_motor.uq_ref`
 - `g_motor.speed_ref_mech_rpm`
-- `g_motor.position_ref_mech_rad`
+- `g_motor.position_ref_mech_deg`
 
 ## 2. 烧录与静态启动
 
@@ -223,16 +223,17 @@
 
 ### 当前默认参数
 
-- `speed_kp = 0.003`
-- `speed_ki = 0.03`
+- `speed_kp = 0.0015`
+- `speed_ki = 0.015`
 
 ## 6. 位置环调试
 
-位置环按 `100 Hz` 运行，并且工作在输出轴坐标系。
+位置环按 `200 Hz` 运行，并且工作在输出轴坐标系。
 
 ### 当前实现特征
 
-- `position_ref_mech_rad` 是输出轴目标位置
+- `position_ref_mech_deg` 是外部写入的输出轴目标位置
+- `position_ref_mech_rad` 是程序内部换算后的弧度镜像
 - `position_meas_mech_rad` 是输出轴实际位置
 - 位置环输出的是“输出轴速度命令”
 - 输出轴速度命令再乘以 `MOTOR_GEAR_RATIO`，送入转子侧速度环
@@ -243,7 +244,7 @@
 - `g_motor.speed_loop_enable = 1`
 - `g_motor.position_loop_enable = 1`
 - `g_motor.position_speed_limit_mech_rad_s` 先设置小一些
-- `g_motor.position_ref_mech_rad` 小步进变化
+- `g_motor.position_ref_mech_deg` 小步进变化
 
 ### 调参顺序
 
@@ -254,7 +255,7 @@
 
 ### 当前默认参数
 
-- `position_kp = 8.0`
+- `position_kp = 3.0`
 - `position_ki = 0.0`
 
 ## 7. 运行中切换环路时要知道的事情
