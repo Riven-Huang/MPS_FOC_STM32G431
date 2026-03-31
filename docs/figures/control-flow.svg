@@ -47,7 +47,7 @@
 
   <rect x="910" y="356" width="280" height="124" class="boxD"/>
   <text x="1050" y="402" text-anchor="middle" class="t1">Position / Speed Loop</text>
-  <text x="1050" y="435" text-anchor="middle" class="t2">100 Hz position</text>
+  <text x="1050" y="435" text-anchor="middle" class="t2">200 Hz position</text>
   <text x="1050" y="462" text-anchor="middle" class="t2">observer-driven speed loop</text>
 
   <rect x="300" y="576" width="340" height="124" class="boxC"/>
@@ -80,4 +80,3 @@
 
   <text x="70" y="884" class="note">Fast loop entry: HAL_ADCEx_InjectedConvCpltCallback() -> program_adc_injected_conv_cplt_callback()</text>
 </svg>
-
