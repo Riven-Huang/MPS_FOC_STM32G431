@@ -21,7 +21,8 @@ static void motor_state_enter(motor_state_t *motor, motor_state_id_t next_state,
  * 输入：motor 为待初始化的状态机对象。
  * 输出：无返回值。
  * 调用频率：系统启动时调用一次。
- * 运行内容：设置默认状态、清零运行和故障变量，并初始化速度滤波器和 PI 占位对象。 */
+ * 运行内容：设置通用初始状态、清零运行和故障变量，并初始化速度滤波器和 PI 占位对象。
+ * 备注：当前项目的有效调参默认值会在 program_init() 中按板级实现统一覆写，这里保留的是结构体级安全初值。 */
 void motor_state_init(motor_state_t *motor)
 {
     if (motor == 0) {
