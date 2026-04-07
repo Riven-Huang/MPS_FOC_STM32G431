@@ -2,7 +2,7 @@
 
 审查日期: 2026-03-25
 
-> 注：本文是 `2026-03-25` 当日的调参快照，里面提到的默认参数仅对应当时版本。当前主分支的现行默认值请以 [`program/App/program.c`](../program/App/program.c)、[`README.md`](../README.md) 和 [`docs/quick-start.md`](./quick-start.md) 为准。
+> 注：本文是 `2026-03-25` 的历史调参快照，里面提到的默认参数仅对应当时版本。当前主分支的现行默认值请以 [`program/App/program.c`](../program/App/program.c)、[`README.md`](../README.md) 和 [`docs/quick-start.md`](./quick-start.md) 为准。
 
 ## 1. 这次改了什么
 
@@ -47,16 +47,16 @@
 
 ## 3. 核心函数频率和执行位置
 
-| 运算 / 函数 | 名义频率 | 真正执行方式 | 执行上下文 |
-| --- | --- | --- | --- |
-| `program_adc_injected_conv_cplt_callback()` | 10 kHz | 每次 ADC1 injected 完成直接执行 | ADC 中断 |
-| `ma600a_read_angle()` | 10 kHz 发起 | 非阻塞启动一次 SPI 传输 | ADC 中断 |
-| `HAL_SPI_TxRxCpltCallback()` -> `ma600a_spi_txrx_cplt()` | 接近 10 kHz | SPI 完成中断回调 | SPI 中断 |
-| `program_update_speed_measurement()` | 每次新编码器样本到达时调用 | 直接函数调用 | ADC 中断 |
-| 窗口差分测速结果更新 | 名义约 1 kHz | 每累计 10 个编码器样本才更新一次 | `program_update_speed_measurement()` 内 |
-| `program_update_speed_loop()` | 每个快环都被调用 | 只有新速度样本 ready 时 PI 才真的执行 | ADC 中断 |
-| `program_run_current_loop()` | 10 kHz | 每次快环直接执行 | ADC 中断 |
-| `program_task()` | while 持续轮询，实际约 1 kHz | 由 TIM6 1 ms 节拍放行 | `while(1)` |
+| 运算 / 函数                                                  | 名义频率                 | 真正执行方式                   | 执行上下文                                  |
+| -------------------------------------------------------- | -------------------- | ------------------------ | -------------------------------------- |
+| `program_adc_injected_conv_cplt_callback()`              | 10 kHz               | 每次 ADC1 injected 完成直接执行  | ADC 中断                                 |
+| `ma600a_read_angle()`                                    | 10 kHz 发起            | 非阻塞启动一次 SPI 传输           | ADC 中断                                 |
+| `HAL_SPI_TxRxCpltCallback()` -> `ma600a_spi_txrx_cplt()` | 接近 10 kHz            | SPI 完成中断回调               | SPI 中断                                 |
+| `program_update_speed_measurement()`                     | 每次新编码器样本到达时调用        | 直接函数调用                   | ADC 中断                                 |
+| 窗口差分测速结果更新                                               | 名义约 1 kHz            | 每累计 10 个编码器样本才更新一次       | `program_update_speed_measurement()` 内 |
+| `program_update_speed_loop()`                            | 每个快环都被调用             | 只有新速度样本 ready 时 PI 才真的执行 | ADC 中断                                 |
+| `program_run_current_loop()`                             | 10 kHz               | 每次快环直接执行                 | ADC 中断                                 |
+| `program_task()`                                         | while 持续轮询，实际约 1 kHz | 由 TIM6 1 ms 节拍放行         | `while(1)`                             |
 
 重点:
 

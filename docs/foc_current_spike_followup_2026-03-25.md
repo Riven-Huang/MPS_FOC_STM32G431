@@ -2,6 +2,8 @@
 
 审查日期: 2026-03-25
 
+> 注：本文整理自 `2026-03-25` 的问题跟进；本文中涉及当前默认值的地方已按现行代码同步，但最终仍以 [`program/App/program.c`](../program/App/program.c) 为准。
+
 ## 1. 现象对应的代码根因
 
 当前电流环本体已经能跟踪 `iq_ref`，但仍然存在“偶发尖峰”风险，主要来自两类输入突变：
@@ -20,17 +22,20 @@
 本次没有去给电流反馈硬加低通，因为那会直接吃掉带宽，而是改成了“命令整形”：
 
 1. 保留原始命令
+   
    - `g_motor.id_ref`
    - `g_motor.iq_ref`
 
 2. 新增内部应用命令
+   
    - `g_id_ref_applied_a`
    - `g_iq_ref_applied_a`
 
 3. 在每个 10 kHz 快环里，应用命令先经过两步处理再进 PI
+   
    - 有限值检查：`NaN/Inf` 直接清零
    - 电流限幅：限制在 `[-g_motor.iq_limit, +g_motor.iq_limit]`
-   - 斜坡限速：按 `PROGRAM_CURRENT_REF_RAMP_A_PER_S = 500 A/s` 推进
+   - 斜坡限速：按 `PROGRAM_CURRENT_REF_RAMP_A_PER_S = 150 A/s` 推进
 
 对应效果：
 
@@ -40,12 +45,12 @@
 
 ## 3. 执行位置和频率
 
-| 运算 | 频率 | 执行方式 | 执行位置 |
-| --- | --- | --- | --- |
-| `program_update_applied_current_references()` | 10 kHz | 直接函数调用 | `ADC1` 注入组完成中断 |
-| `program_run_current_loop()` | 10 kHz | 直接函数调用 | `ADC1` 注入组完成中断 |
-| 电流参考斜坡更新 | 100 us 一次 | 限速器 | `program_run_current_loop()` 内 |
-| 原始命令遥测刷新 | 10 kHz 节拍下同步更新 | 结构体写入 | `program_update_debug_telemetry()` |
+| 运算                                            | 频率             | 执行方式   | 执行位置                               |
+| --------------------------------------------- | -------------- | ------ | ---------------------------------- |
+| `program_update_applied_current_references()` | 10 kHz         | 直接函数调用 | `ADC1` 注入组完成中断                     |
+| `program_run_current_loop()`                  | 10 kHz         | 直接函数调用 | `ADC1` 注入组完成中断                     |
+| 电流参考斜坡更新                                      | 100 us 一次      | 限速器    | `program_run_current_loop()` 内     |
+| 原始命令遥测刷新                                      | 10 kHz 节拍下同步更新 | 结构体写入  | `program_update_debug_telemetry()` |
 
 ## 4. 推荐调试抓取量
 
@@ -67,22 +72,27 @@
 ## 5. 建议的调试步骤
 
 1. 先在 `speed_loop_enable = 0` 下做小阶跃
+   
    - 例如 `iq_ref_cmd: 0 -> 0.2 -> 0.5 A`
    - 先不要直接上更大的电流
 
 2. 同时看 `iq_ref_cmd` 和 `iq_ref_applied_cmd`
+   
    - 确认应用命令是否按斜坡推进
    - 如果两者完全重合，说明你看的不是这次新增的遥测变量
 
 3. 观察 `iq` 和 `uq_ref_cmd`
+   
    - 正常情况下，`iq` 应该跟随 `iq_ref_applied_cmd`
    - `uq_ref_cmd` 会有响应，但不应该出现单拍特别高的尖刺
 
 4. 一旦看到异常尖峰，立刻对比 `theta_elec`
+   
    - 如果 `theta_elec` 同拍发生跳变，问题更偏角度链路
    - 如果 `theta_elec` 很平滑，但 `iq` 乱跳，问题更偏采样链路或 PI 参数
 
 5. 再看是否机械自由转动
+   
    - 如果自由轴未锁定，`iq_ref_applied_cmd > 0` 时电机转起来是正常的
    - 想纯看静态电流环，建议锁轴，或者先测 `id` 阶跃
 
