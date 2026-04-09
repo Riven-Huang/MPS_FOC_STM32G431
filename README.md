@@ -87,16 +87,18 @@
     <img src="docs/images/mps方案图.png">
 </p>
 
-MPS 中国大学计划面向高校教学、科研与竞赛项目，适合本项目所用电机控制相关器件申请。若需要 `MP6539B`、`MA600A`、`MIE1W0505`、`MP4583`、`MPM3632S`、`MP20051` 等样片，可通过对应入口申请。
+**工程复刻福利:**
 
-- 在校大学生：使用 [MPS大学计划](https://www.monolithicpower.cn/cn/support/mps-cn-university.html)
-- 非在校个人开发者：使用 [MPSNOW](https://www.monolithicpower.cn/cn/support/mps-now.html)
-- 申请备注：`MPS-competition-FOC`
+想快速复刻本关节电机工程？特联合MPS为开发者提供免费样品申领福利，工程同款芯片直接送，帮你零成本启动项目开发！可通过下方二维码或点击链接直接申领
+
+https://app-u.jingsocial.com/surl/JNH9Kul
+
+（附下方申请流程图）
 
 ### 2.2 二维码入口
 
 <p align="center">
-  <img src="docs/images/mps-university-qr.png" alt="MPS University Program QR" width="330">
+  <img src="docs/images/mps大学计划.png" alt="MPS University Program QR">
 </p>
 
 ---
