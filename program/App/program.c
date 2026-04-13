@@ -41,12 +41,12 @@
 #define PROGRAM_DEFAULT_POSITION_KD           0.0f
 #define PROGRAM_DEFAULT_POSITION_SPEED_LIMIT_MECH_RAD_S (PROGRAM_DEFAULT_SPEED_REF_MECH_RAD_S / MOTOR_GEAR_RATIO)
 #define PROGRAM_POSITION_MEAS_LPF_CUTOFF_HZ   12.0f
-#define PROGRAM_POSITION_HOLD_ERR_RAD         0.0040f
-#define PROGRAM_POSITION_HOLD_RELEASE_ERR_RAD 0.0150f
+#define PROGRAM_POSITION_HOLD_ERR_RAD         0.021f   // 约 1.2°
+#define PROGRAM_POSITION_HOLD_RELEASE_ERR_RAD 0.031f   // 约 1.8°
 #define PROGRAM_POSITION_HOLD_SPEED_MECH_RAD_S 0.50f
-#define PROGRAM_POSITION_HOLD_RELEASE_CONFIRM_CYCLES 20U
-#define PROGRAM_POSITION_CREEP_ENABLE_ERR_RAD 0.0300f
-#define PROGRAM_POSITION_CREEP_SPEED_MECH_RAD_S 0.10f
+#define PROGRAM_POSITION_HOLD_RELEASE_CONFIRM_CYCLES 12U
+#define PROGRAM_POSITION_CREEP_ENABLE_ERR_RAD 0.045f   // 约 2.6°
+#define PROGRAM_POSITION_CREEP_SPEED_MECH_RAD_S 0.020f
 #define PROGRAM_DEFAULT_IQ_LIMIT_A            12.00f
 /* Equivalent plant inferred from the legacy 1 kHz tuning:
  * 1 kHz -> kp 2.5761, ki 4555.31
@@ -71,6 +71,9 @@
 #define PROGRAM_CURRENT_SIGN_IA               (1.0f)
 #define PROGRAM_CURRENT_SIGN_IB               (1.0f)
 #define PROGRAM_CURRENT_SIGN_IC               (1.0f)
+#define PROGRAM_DEBUG_PWM_TEST_DEFAULT_DUTY_A 0.30f
+#define PROGRAM_DEBUG_PWM_TEST_DEFAULT_DUTY_B 0.40f
+#define PROGRAM_DEBUG_PWM_TEST_DEFAULT_DUTY_C 0.60f
 
 /* 全局控制对象：
  * 电机状态机、FOC 核心、编码器驱动和调试遥测都由 program 层统一持有。 */
@@ -78,6 +81,7 @@ motor_state_t g_motor;
 foc_core_t g_foc;
 static ma600a_t g_ma600a;
 volatile program_telemetry_t g_program_telemetry;
+volatile program_debug_pwm_test_t g_program_debug_pwm_test;
 static filter_lpf_f32_t g_vbus_lpf;
 
 /* 慢速采样与后台调度状态：
@@ -134,6 +138,8 @@ static float program_run_pi_f32(float ref,
                                 float *integral,
                                 float out_min,
                                 float out_max);
+static uint8_t program_debug_pwm_test_is_enabled(void);
+static void program_apply_debug_pwm_test_output(void);
 
 /* 函数作用：限制浮点量上下界。
  * 输入：value、min_value、max_value。输出：返回限幅结果。调用频率：各控制环按需调用。运行内容：为电流、电压和速度中间量提供统一限幅。 */
@@ -1120,6 +1126,24 @@ static void program_set_power_stage_enable(uint8_t enable)
     g_program_telemetry.power_stage_enabled = next_state;
 }
 
+static uint8_t program_debug_pwm_test_is_enabled(void)
+{
+    return (g_program_debug_pwm_test.enable != 0U) ? 1U : 0U;
+}
+
+static void program_apply_debug_pwm_test_output(void)
+{
+    foc_svpwm_duty_t debug_duty;
+
+    debug_duty.duty_a = program_clamp_f32(g_program_debug_pwm_test.duty_a, 0.0f, 1.0f);
+    debug_duty.duty_b = program_clamp_f32(g_program_debug_pwm_test.duty_b, 0.0f, 1.0f);
+    debug_duty.duty_c = program_clamp_f32(g_program_debug_pwm_test.duty_c, 0.0f, 1.0f);
+
+    g_foc.duty = debug_duty;
+    program_apply_svpwm_to_tim1(&debug_duty);
+    program_set_power_stage_enable(1U);
+}
+
 /* 函数作用：按照原理图分流电阻和电流采样放大器参数，把原始 ADC 码值换算成相电流。
  * 输入：raw 为某一相当前 ADC 原始码值，offset_raw 为该相零电流偏置码值。
  * 输出：返回该相电流估计值，单位 A。
@@ -1447,6 +1471,21 @@ static void program_run_speed_current_control(void)
     driver_fault_active = program_is_driver_fault_active();
     g_program_telemetry.driver_fault_active = driver_fault_active;
 
+    if (program_debug_pwm_test_is_enabled() != 0U) {
+        if (driver_fault_active != 0U) {
+            program_set_power_stage_enable(0U);
+            foc_core_reset_output(&g_foc);
+            foc_core_set_electrical_angle(&g_foc, 0.0f);
+            program_apply_svpwm_to_tim1(&g_foc.duty);
+            g_motor.state = MOTOR_STATE_FAULT;
+        } else {
+            program_apply_debug_pwm_test_output();
+            g_motor.state = MOTOR_STATE_READY;
+        }
+        program_update_debug_telemetry();
+        return;
+    }
+
     if ((driver_fault_active != 0U) ||
         (g_program_telemetry.current_offset_ready == 0U) ||
         (g_program_telemetry.ma600a_angle_valid == 0U)) {
@@ -1725,6 +1764,10 @@ void program_init(void)
     program_set_power_stage_enable(0U);
 
     program_init_telemetry();
+    g_program_debug_pwm_test.enable = 0U;
+    g_program_debug_pwm_test.duty_a = PROGRAM_DEBUG_PWM_TEST_DEFAULT_DUTY_A;
+    g_program_debug_pwm_test.duty_b = PROGRAM_DEBUG_PWM_TEST_DEFAULT_DUTY_B;
+    g_program_debug_pwm_test.duty_c = PROGRAM_DEBUG_PWM_TEST_DEFAULT_DUTY_C;
 
     if (HAL_ADCEx_Calibration_Start(&hadc1, ADC_SINGLE_ENDED) != HAL_OK) {
         Error_Handler();
