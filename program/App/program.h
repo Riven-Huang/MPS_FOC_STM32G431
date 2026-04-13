@@ -92,7 +92,16 @@ typedef struct
     float fast_loop_period_us;
 } program_telemetry_t;
 
+typedef struct
+{
+    uint8_t enable;
+    float duty_a;
+    float duty_b;
+    float duty_c;
+} program_debug_pwm_test_t;
+
 extern volatile program_telemetry_t g_program_telemetry;
+extern volatile program_debug_pwm_test_t g_program_debug_pwm_test;
 extern motor_state_t g_motor;
 extern foc_core_t g_foc;
 

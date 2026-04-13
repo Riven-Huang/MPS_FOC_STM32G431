@@ -306,6 +306,8 @@ const volatile program_telemetry_t *program_get_telemetry(void);
 | `g_motor.iq_limit`                       | A       | 电流 / 转矩限幅                        |
 | `g_motor.speed_kp` / `g_motor.speed_ki`  | -       | 速度环参数                            |
 | `g_motor.position_kp`                    | -       | 位置环比例参数                          |
+| `g_program_debug_pwm_test.enable`        | `0 / 1` | 固定占空比 PWM 发波测试开关；`1` 时快环直接接管三相占空比输出 |
+| `g_program_debug_pwm_test.duty_a/b/c`    | `0~1`   | A/B/C 三相固定占空比；默认初始化为 `0.30 / 0.40 / 0.60` |
 
 ### 6.4 软件观测接口
 
@@ -324,6 +326,7 @@ const volatile program_telemetry_t *program_get_telemetry(void);
 - `g_motor.position_ref_mech_deg` 是当前项目建议的外部位置指令入口；`position_ref_mech_rad` 更适合看作程序内部换算后的只读镜像。
 - `N_FAULT` 为低有效，驱动器报错时会直接进入故障处理并拉低功率级使能。
 - `run_request` 建议最后置位；在修改模式位和参考值后再启动，可以减少上电瞬间的误动作。
+- `g_program_debug_pwm_test` 仅用于空载、断开电机时验证三相 PWM 发波能力；测试模式下会旁路正常 FOC 输出，但仍保留 `N_FAULT` 保护。
 - 当前仓库默认 `iq_limit = 12 A` 是比赛带载验证时的调试上限，不代表 `GIM6010-8` 的长期额定连续电流。
 - 更换电机、减速比、编码器安装位置或方向后，除了改 [`program/App/motor_params.h`](program/App/motor_params.h)，还应重新核对 [`program/App/program.c`](program/App/program.c) 的环路参数和限幅设置。
 
@@ -421,7 +424,33 @@ g_motor.run_request = 1;   /*  最核心的启动信号，启动这个才开始�
 
 程序会先自动做对齐，再进入基于编码器角度的手动电压模式。
 
-### 8.4 模式控制说明
+### 8.4 固定占空比 PWM 发波测试（不接电机）
+
+当需要单独验证 `TIM1 + MP6539B` 的三相发波链路时，可以直接在调试器里写 `g_program_debug_pwm_test`，不依赖 `run_request`、编码器闭环或正常 FOC 输出。
+
+推荐操作顺序：
+
+```c
+g_program_debug_pwm_test.duty_a = 0.30f;
+g_program_debug_pwm_test.duty_b = 0.40f;
+g_program_debug_pwm_test.duty_c = 0.60f;
+g_program_debug_pwm_test.enable = 1U;
+```
+
+测试完成后请恢复：
+
+```c
+g_program_debug_pwm_test.enable = 0U;
+```
+
+注意事项：
+
+- 该模式只用于示波器观察三相 PWM，占空比范围为 `0.0~1.0`。
+- 进入测试模式前请断开电机或确保功率级不带机械负载，避免误转动。
+- 该模式在快环中直接下发 `TIM1->CCR1/2/3`，正常电流环 / 速度环 / 位置环输出会被旁路。
+- 若 `N_FAULT` 有效，程序仍会关闭功率级，不会继续维持固定占空比输出。
+
+### 8.5 模式控制说明
 
 模式变量的完整定义见 `6.3 软件写入接口`。这里仅保留首次调试最常用的组合方式：
 
@@ -432,7 +461,7 @@ g_motor.run_request = 1;   /*  最核心的启动信号，启动这个才开始�
 
 位置外部给定建议直接写 `g_motor.position_ref_mech_deg`。
 
-### 8.5 首次需要看的变量
+### 8.6 首次需要看的变量
 
 | 👀 变量                  | 正常现象      |
 | ---------------------- | --------- |
@@ -443,7 +472,7 @@ g_motor.run_request = 1;   /*  最核心的启动信号，启动这个才开始�
 | `driver_fault_active`  | `0`       |
 | `fast_loop_overrun`    | `0`       |
 
-### 8.6 三环由内到外的闭环调试顺序
+### 8.7 三环由内到外的闭环调试顺序
 
 不要跳步，建议严格按“由内到外”执行：
 
@@ -455,7 +484,7 @@ g_motor.run_request = 1;   /*  最核心的启动信号，启动这个才开始�
 | Stage 3 | 调速度环   | 开速度环，位置环保持关闭      | `speed_ref_mech_rpm` `speed_meas_mech_rpm`       |
 | Stage 4 | 调位置环   | 最后再开位置环           | `position_ref_mech_deg` `position_meas_mech_deg` |
 
-### 8.7 当前运行默认参数
+### 8.8 当前运行默认参数
 
 以下为当前主路径实际生效的默认参数，来源于 [`program/App/program.c`](program/App/program.c)：
 
