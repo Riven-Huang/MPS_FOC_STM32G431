@@ -1,0 +1,62 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1000" viewBox="0 0 1600 1000">
+  <defs>
+    <marker id="arrow-gray" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#7b8491"/>
+    </marker>
+    <marker id="arrow-red" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#d62828"/>
+    </marker>
+    <marker id="arrow-black" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#111827"/>
+    </marker>
+    <marker id="arrow-blue" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#1769c2"/>
+    </marker>
+    <marker id="arrow-green" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#138a4b"/>
+    </marker>
+    <style>
+      .axis-label { font: italic 54px "Times New Roman", serif; }
+      .vector-label { font: italic 50px "Times New Roman", serif; }
+      .angle-label { font: italic 46px "Times New Roman", serif; fill: #111827; }
+      .note { font: 34px "Microsoft YaHei", "Noto Sans CJK SC", sans-serif; fill: #374151; }
+    </style>
+  </defs>
+
+  <rect width="1600" height="1000" fill="#ffffff"/>
+
+  <!-- Common origin O = (620, 760). Stationary alpha-beta frame. -->
+  <line x1="620" y1="760" x2="1450" y2="760" stroke="#7b8491" stroke-width="4" marker-end="url(#arrow-gray)"/>
+  <line x1="620" y1="760" x2="620" y2="80" stroke="#7b8491" stroke-width="4" marker-end="url(#arrow-gray)"/>
+  <text x="1470" y="780" class="axis-label" fill="#7b8491">α</text>
+  <text x="590" y="68" class="axis-label" fill="#7b8491">β</text>
+
+  <!-- Rotating d-q frame: d = 30 degrees, q = 120 degrees, exactly perpendicular. -->
+  <line x1="620" y1="760" x2="1295.5" y2="370" stroke="#d62828" stroke-width="6" marker-end="url(#arrow-red)"/>
+  <line x1="620" y1="760" x2="280" y2="171.1" stroke="#d62828" stroke-width="6" marker-end="url(#arrow-red)"/>
+  <text x="1313" y="365" class="axis-label" fill="#d62828">d</text>
+  <text x="244" y="155" class="axis-label" fill="#d62828">q</text>
+
+  <!-- Enlarged right-angle marker between d and q. -->
+  <polyline points="672,730 642,678 590,708" fill="none" stroke="#d62828" stroke-width="6" stroke-linejoin="miter"/>
+  <text x="555" y="645" class="note" fill="#d62828">90°</text>
+
+  <!-- Electrical angle theta_e from alpha to d. -->
+  <path d="M 790 760 A 170 170 0 0 0 767.2 675" fill="none" stroke="#111827" stroke-width="4" marker-end="url(#arrow-black)"/>
+  <text x="790" y="692" class="angle-label">θ<tspan baseline-shift="sub" font-size="30">e</tspan></text>
+
+  <!-- Current vector i_s at 70 degrees. -->
+  <line x1="620" y1="760" x2="821.8" y2="205.6" stroke="#111827" stroke-width="7" marker-end="url(#arrow-black)"/>
+  <text x="840" y="205" class="vector-label" fill="#111827">i<tspan baseline-shift="sub" font-size="32">s</tspan></text>
+
+  <!-- Orthogonal decomposition: i_s = i_d + i_q. -->
+  <line x1="620" y1="760" x2="1011.4" y2="534" stroke="#1769c2" stroke-width="7" marker-end="url(#arrow-blue)"/>
+  <text x="880" y="625" class="vector-label" fill="#1769c2">i<tspan baseline-shift="sub" font-size="32">d</tspan></text>
+
+  <line x1="1011.4" y1="534" x2="821.8" y2="205.6" stroke="#138a4b" stroke-width="7" marker-end="url(#arrow-green)"/>
+  <text x="965" y="365" class="vector-label" fill="#138a4b">i<tspan baseline-shift="sub" font-size="32">q</tspan></text>
+
+  <!-- Projection guides emphasize that i_d is along d and i_q is parallel to q. -->
+  <line x1="1011.4" y1="534" x2="821.8" y2="205.6" stroke="#138a4b" stroke-width="2" stroke-dasharray="10 10" opacity="0.35"/>
+  <circle cx="620" cy="760" r="8" fill="#111827"/>
+</svg>

@@ -1,0 +1,263 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1920" height="1080" viewBox="0 0 1920 1080">
+  <defs>
+    <style>
+      .bg { fill: #ffffff; }
+      .blue { fill: #0070c0; }
+      .title { font: 700 38px "Microsoft YaHei", "Segoe UI", sans-serif; fill: #ffffff; }
+      .subtitle { font: 500 19px "Microsoft YaHei", "Segoe UI", sans-serif; fill: #eaf5ff; }
+      .label { font: 700 18px "Microsoft YaHei", "Segoe UI", sans-serif; fill: #005a9e; }
+      .small { font: 500 15px "Microsoft YaHei", "Segoe UI", sans-serif; fill: #222222; }
+      .tiny { font: 500 13px "Microsoft YaHei", "Segoe UI", sans-serif; fill: #4a4a4a; }
+      .box-title { font: 700 22px "Microsoft YaHei", "Segoe UI", sans-serif; }
+      .box-text { font: 500 15px "Microsoft YaHei", "Segoe UI", sans-serif; fill: #202020; }
+      .code { font: 700 15px "Consolas", "Microsoft YaHei", monospace; fill: #004b86; }
+      .lane-text { font: 700 25px "Microsoft YaHei", "Segoe UI", sans-serif; }
+      .note { font: 700 17px "Microsoft YaHei", "Segoe UI", sans-serif; fill: #005a9e; }
+      .source { font: 500 13px "Consolas", "Microsoft YaHei", monospace; fill: #606060; }
+      .box { fill: #ffffff; stroke: #b7c9da; stroke-width: 2; rx: 18; ry: 18; }
+      .init { fill: #eaf5ff; stroke: #0070c0; }
+      .fast { fill: #fff2df; stroke: #ed7d31; }
+      .algo { fill: #e8f6ef; stroke: #2e9d61; }
+      .state { fill: #ffffff; stroke: #7a9dbd; }
+      .safe { fill: #ffecea; stroke: #c9433b; }
+      .slow { fill: #f3f5f8; stroke: #7a7a7a; }
+      .bus { fill: #f0f7ff; stroke: #7eb0da; }
+      .shadow { filter: drop-shadow(0 2px 4px rgba(0,0,0,0.10)); }
+      .arrow-main { stroke: #005a9e; stroke-width: 5; fill: none; marker-end: url(#arrowBlue); }
+      .arrow-fast { stroke: #ed7d31; stroke-width: 4; fill: none; marker-end: url(#arrowOrange); }
+      .arrow-algo { stroke: #2e9d61; stroke-width: 4; fill: none; marker-end: url(#arrowGreen); }
+      .arrow-safe { stroke: #c9433b; stroke-width: 4; fill: none; marker-end: url(#arrowRed); }
+      .arrow-slow { stroke: #7a7a7a; stroke-width: 3; fill: none; marker-end: url(#arrowGray); }
+      .arrow-dash { stroke-dasharray: 10 8; }
+    </style>
+    <marker id="arrowBlue" markerWidth="14" markerHeight="14" refX="12" refY="7" orient="auto">
+      <path d="M0,0 L14,7 L0,14 Z" fill="#005a9e"/>
+    </marker>
+    <marker id="arrowOrange" markerWidth="14" markerHeight="14" refX="12" refY="7" orient="auto">
+      <path d="M0,0 L14,7 L0,14 Z" fill="#ed7d31"/>
+    </marker>
+    <marker id="arrowGreen" markerWidth="14" markerHeight="14" refX="12" refY="7" orient="auto">
+      <path d="M0,0 L14,7 L0,14 Z" fill="#2e9d61"/>
+    </marker>
+    <marker id="arrowRed" markerWidth="14" markerHeight="14" refX="12" refY="7" orient="auto">
+      <path d="M0,0 L14,7 L0,14 Z" fill="#c9433b"/>
+    </marker>
+    <marker id="arrowGray" markerWidth="14" markerHeight="14" refX="12" refY="7" orient="auto">
+      <path d="M0,0 L14,7 L0,14 Z" fill="#7a7a7a"/>
+    </marker>
+  </defs>
+
+  <rect class="bg" x="0" y="0" width="1920" height="1080"/>
+
+  <rect class="blue" x="72" y="44" width="1776" height="88" rx="0"/>
+  <text class="title" x="112" y="99">FOC 代码逻辑图：从上电入口到闭环输出</text>
+  <text class="subtitle" x="1260" y="99">主线：初始化 → 10kHz 快环 → 状态机 → FOC → PWM 输出</text>
+
+  <g transform="translate(72,160)">
+    <rect x="0" y="0" width="1776" height="840" rx="22" fill="#ffffff" stroke="#d4e3f0" stroke-width="2"/>
+
+    <!-- Left lane labels -->
+    <rect x="24" y="40" width="112" height="118" class="init"/>
+    <text class="lane-text" x="80" y="86" text-anchor="middle" fill="#005a9e">启动</text>
+    <text class="lane-text" x="80" y="118" text-anchor="middle" fill="#005a9e">初始化</text>
+
+    <rect x="24" y="205" width="112" height="382" class="fast"/>
+    <text class="lane-text" x="80" y="344" text-anchor="middle" fill="#d46b08">10 kHz</text>
+    <text class="lane-text" x="80" y="378" text-anchor="middle" fill="#d46b08">控制快环</text>
+
+    <rect x="24" y="630" width="112" height="146" class="slow"/>
+    <text class="lane-text" x="80" y="690" text-anchor="middle" fill="#6c6c6c">1 kHz</text>
+    <text class="lane-text" x="80" y="724" text-anchor="middle" fill="#6c6c6c">后台遥测</text>
+
+    <!-- Initialization flow -->
+    <g class="shadow">
+      <rect x="170" y="38" width="188" height="116" class="box init"/>
+      <text class="box-title" x="264" y="74" text-anchor="middle" fill="#005a9e">1. main()</text>
+      <text class="box-text" x="264" y="101" text-anchor="middle">HAL / Clock</text>
+      <text class="box-text" x="264" y="124" text-anchor="middle">MX_GPIO / DMA / ADC</text>
+      <text class="source" x="264" y="146" text-anchor="middle">Core/Src/main.c</text>
+
+      <rect x="410" y="38" width="206" height="116" class="box init"/>
+      <text class="box-title" x="513" y="74" text-anchor="middle" fill="#005a9e">2. program_init()</text>
+      <text class="box-text" x="513" y="101" text-anchor="middle">驱动休眠，ADC 校准</text>
+      <text class="box-text" x="513" y="124" text-anchor="middle">初始化 g_motor / g_foc</text>
+      <text class="source" x="513" y="146" text-anchor="middle">App/program.c</text>
+
+      <rect x="668" y="38" width="220" height="116" class="box init"/>
+      <text class="box-title" x="778" y="74" text-anchor="middle" fill="#005a9e">3. 启动采样链</text>
+      <text class="box-text" x="778" y="101" text-anchor="middle">ADC2 DMA + TIM6</text>
+      <text class="box-text" x="778" y="124" text-anchor="middle">TIM1 PWM + ADC1 Injected</text>
+      <text class="source" x="778" y="146" text-anchor="middle">start_adc*_chain()</text>
+
+      <rect x="940" y="38" width="204" height="116" class="box init"/>
+      <text class="box-title" x="1042" y="74" text-anchor="middle" fill="#005a9e">4. 进入后台</text>
+      <text class="box-text" x="1042" y="101" text-anchor="middle">while(1)</text>
+      <text class="box-text" x="1042" y="124" text-anchor="middle">program_task()</text>
+      <text class="source" x="1042" y="146" text-anchor="middle">慢任务入口</text>
+    </g>
+    <path class="arrow-main" d="M358 96 L410 96"/>
+    <path class="arrow-main" d="M616 96 L668 96"/>
+    <path class="arrow-main" d="M888 96 L940 96"/>
+    <path class="arrow-fast" d="M778 154 L778 214"/>
+
+    <!-- Fast-loop trigger and feedback -->
+    <g class="shadow">
+      <rect x="170" y="222" width="182" height="104" class="box fast"/>
+      <text class="box-title" x="261" y="258" text-anchor="middle" fill="#d46b08">TIM1_TRGO2</text>
+      <text class="box-text" x="261" y="286" text-anchor="middle">中心对齐 PWM 节点</text>
+      <text class="box-text" x="261" y="309" text-anchor="middle">触发三相电流采样</text>
+
+      <rect x="408" y="222" width="186" height="104" class="box fast"/>
+      <text class="box-title" x="501" y="258" text-anchor="middle" fill="#d46b08">ADC1 Injected</text>
+      <text class="box-text" x="501" y="286" text-anchor="middle">采样 IA / IB / IC</text>
+      <text class="source" x="501" y="309" text-anchor="middle">HAL_ADCEx_...</text>
+
+      <rect x="650" y="222" width="204" height="104" class="box fast"/>
+      <text class="box-title" x="752" y="258" text-anchor="middle" fill="#d46b08">快环回调</text>
+      <text class="code" x="752" y="286" text-anchor="middle">program_adc_injected</text>
+      <text class="code" x="752" y="308" text-anchor="middle">_conv_cplt_callback()</text>
+
+      <rect x="910" y="222" width="184" height="104" class="box safe"/>
+      <text class="box-title" x="1002" y="258" text-anchor="middle" fill="#c9433b">零点校准</text>
+      <text class="box-text" x="1002" y="286" text-anchor="middle">未 ready 时累计</text>
+      <text class="box-text" x="1002" y="309" text-anchor="middle">1024 点 offset</text>
+
+      <rect x="1152" y="222" width="188" height="104" class="box init"/>
+      <text class="box-title" x="1246" y="258" text-anchor="middle" fill="#005a9e">MA600A</text>
+      <text class="box-text" x="1246" y="286" text-anchor="middle">SPI IT 读取角度</text>
+      <text class="box-text" x="1246" y="309" text-anchor="middle">raw / deg / rad</text>
+
+      <rect x="1398" y="222" width="230" height="104" class="box init"/>
+      <text class="box-title" x="1513" y="258" text-anchor="middle" fill="#005a9e">角度与速度观测</text>
+      <text class="box-text" x="1513" y="286" text-anchor="middle">theta_elec</text>
+      <text class="box-text" x="1513" y="309" text-anchor="middle">20 样本窗口 + LPF</text>
+    </g>
+    <path class="arrow-fast" d="M352 274 L408 274"/>
+    <path class="arrow-fast" d="M594 274 L650 274"/>
+    <path class="arrow-fast" d="M854 274 L910 274"/>
+    <path class="arrow-main" d="M1094 274 L1152 274"/>
+    <path class="arrow-main" d="M1340 274 L1398 274"/>
+
+    <!-- Current transformation and state machine -->
+    <g class="shadow">
+      <rect x="170" y="386" width="216" height="116" class="box fast"/>
+      <text class="box-title" x="278" y="422" text-anchor="middle" fill="#d46b08">电流工程量</text>
+      <text class="box-text" x="278" y="450" text-anchor="middle">raw - offset → A</text>
+      <text class="box-text" x="278" y="473" text-anchor="middle">极性修正，得到 ia/ib/ic</text>
+      <text class="source" x="278" y="496" text-anchor="middle">convert_current_from_raw()</text>
+
+      <rect x="450" y="386" width="222" height="116" class="box algo"/>
+      <text class="box-title" x="561" y="422" text-anchor="middle" fill="#2e9d61">Clarke / Park</text>
+      <text class="box-text" x="561" y="450" text-anchor="middle">abc → αβ → dq</text>
+      <text class="box-text" x="561" y="473" text-anchor="middle">电流反馈：id / iq</text>
+      <text class="source" x="561" y="496" text-anchor="middle">foc_core_clarke/park()</text>
+
+      <rect x="735" y="372" width="314" height="144" class="box state"/>
+      <text class="box-title" x="892" y="410" text-anchor="middle" fill="#005a9e">状态机：统一决定能不能发力</text>
+      <text class="box-text" x="892" y="441" text-anchor="middle">故障 / offset / 角度检查</text>
+      <text class="box-text" x="892" y="466" text-anchor="middle">run_request 停机判断</text>
+      <text class="box-text" x="892" y="491" text-anchor="middle">ALIGN 对齐 → CLOSED_LOOP 闭环</text>
+      <text class="source" x="892" y="512" text-anchor="middle">program_run_speed_current_control()</text>
+
+      <rect x="1120" y="386" width="232" height="116" class="box fast"/>
+      <text class="box-title" x="1236" y="422" text-anchor="middle" fill="#d46b08">外环：位置 / 速度</text>
+      <text class="box-text" x="1236" y="450" text-anchor="middle">位置环 200 Hz 可选</text>
+      <text class="box-text" x="1236" y="473" text-anchor="middle">速度 PI：ω_ref - ω_meas</text>
+      <text class="source" x="1236" y="496" text-anchor="middle">输出 iq_ref 或 uq_ref</text>
+
+      <rect x="1416" y="386" width="230" height="116" class="box algo"/>
+      <text class="box-title" x="1531" y="422" text-anchor="middle" fill="#2e9d61">内环：电流 / 电压</text>
+      <text class="box-text" x="1531" y="450" text-anchor="middle">id / iq PI</text>
+      <text class="box-text" x="1531" y="473" text-anchor="middle">电压矢量限幅</text>
+      <text class="source" x="1531" y="496" text-anchor="middle">得到 ud / uq</text>
+    </g>
+
+    <path class="arrow-fast" d="M752 326 C752 354 278 354 278 386"/>
+    <path class="arrow-algo" d="M386 444 L450 444"/>
+    <path class="arrow-algo" d="M672 444 L735 444"/>
+    <path class="arrow-main" d="M1513 326 L1513 356 L1018 356 L1018 390"/>
+    <path class="arrow-fast" d="M1049 444 L1120 444"/>
+    <path class="arrow-algo" d="M1352 444 L1416 444"/>
+
+    <!-- Safety and output -->
+    <g class="shadow">
+      <rect x="735" y="548" width="314" height="76" class="box safe"/>
+      <text class="box-title" x="892" y="581" text-anchor="middle" fill="#c9433b">安全分支</text>
+      <text class="box-text" x="892" y="608" text-anchor="middle">FAULT / 未准备 / 停机：N_SLEEP=0，PWM=50%，复位 PI</text>
+
+      <rect x="1120" y="548" width="232" height="96" class="box algo"/>
+      <text class="box-title" x="1236" y="583" text-anchor="middle" fill="#2e9d61">FOC 数学输出</text>
+      <text class="box-text" x="1236" y="611" text-anchor="middle">反 Park：dq → αβ</text>
+      <text class="box-text" x="1236" y="634" text-anchor="middle">SVPWM：duty_a/b/c</text>
+
+      <rect x="1416" y="548" width="190" height="96" class="box init"/>
+      <text class="box-title" x="1511" y="583" text-anchor="middle" fill="#005a9e">TIM1 CCR</text>
+      <text class="box-text" x="1511" y="611" text-anchor="middle">CCR1/2/3 更新</text>
+      <text class="box-text" x="1511" y="634" text-anchor="middle">三相互补 PWM</text>
+
+      <rect x="1646" y="548" width="94" height="96" class="box init"/>
+      <text class="box-title" x="1693" y="583" text-anchor="middle" fill="#005a9e">功率级</text>
+      <text class="box-text" x="1693" y="611" text-anchor="middle">MP6539B</text>
+      <text class="box-text" x="1693" y="634" text-anchor="middle">MOSFET/电机</text>
+    </g>
+    <path class="arrow-safe" d="M892 516 L892 548"/>
+    <path class="arrow-algo" d="M1531 502 C1531 528 1236 528 1236 548"/>
+    <path class="arrow-algo" d="M1352 596 L1416 596"/>
+    <path class="arrow-main" d="M1606 596 L1646 596"/>
+
+    <!-- Shared runtime data bus -->
+    <g>
+      <rect x="170" y="678" width="1470" height="56" class="bus" rx="18"/>
+      <text class="note" x="905" y="713" text-anchor="middle">共享运行态：g_program_telemetry 负责观测，g_motor 负责状态/指令，g_foc 负责 FOC 计算中间量和最终占空比</text>
+      <path class="arrow-main arrow-dash" d="M560 502 L560 678"/>
+      <path class="arrow-main arrow-dash" d="M892 516 L892 678"/>
+      <path class="arrow-main arrow-dash" d="M1236 644 L1236 678"/>
+    </g>
+
+    <!-- Slow path -->
+    <g class="shadow">
+      <rect x="170" y="766" width="188" height="72" class="box slow"/>
+      <text class="box-title" x="264" y="796" text-anchor="middle" fill="#6c6c6c">TIM6 tick</text>
+      <text class="box-text" x="264" y="823" text-anchor="middle">1 ms 后台节拍</text>
+
+      <rect x="410" y="766" width="188" height="72" class="box slow"/>
+      <text class="box-title" x="504" y="796" text-anchor="middle" fill="#6c6c6c">program_task()</text>
+      <text class="box-text" x="504" y="823" text-anchor="middle">while(1) 按 tick 执行</text>
+
+      <rect x="650" y="766" width="222" height="72" class="box slow"/>
+      <text class="box-title" x="761" y="796" text-anchor="middle" fill="#6c6c6c">ADC2 DMA 慢变量</text>
+      <text class="box-text" x="761" y="823" text-anchor="middle">VBUS / NTC，母线电压 LPF</text>
+
+      <rect x="928" y="766" width="208" height="72" class="box slow"/>
+      <text class="box-title" x="1032" y="796" text-anchor="middle" fill="#6c6c6c">故障与遥测快照</text>
+      <text class="box-text" x="1032" y="823" text-anchor="middle">driver_fault / g_motor / g_foc</text>
+
+      <rect x="1192" y="766" width="202" height="72" class="box slow"/>
+      <text class="box-title" x="1293" y="796" text-anchor="middle" fill="#6c6c6c">VOFA 输出</text>
+      <text class="box-text" x="1293" y="823" text-anchor="middle">USART1 DMA，JustFloat</text>
+
+      <rect x="1450" y="766" width="190" height="72" class="box slow"/>
+      <text class="box-title" x="1545" y="796" text-anchor="middle" fill="#6c6c6c">视频演示曲线</text>
+      <text class="box-text" x="1545" y="823" text-anchor="middle">速度 / 位置 / 调参排查</text>
+    </g>
+    <path class="arrow-slow" d="M358 802 L410 802"/>
+    <path class="arrow-slow" d="M598 802 L650 802"/>
+    <path class="arrow-slow" d="M872 802 L928 802"/>
+    <path class="arrow-slow" d="M1136 802 L1192 802"/>
+    <path class="arrow-slow" d="M1394 802 L1450 802"/>
+    <path class="arrow-slow arrow-dash" d="M778 154 L778 766"/>
+    <path class="arrow-slow arrow-dash" d="M1042 154 L1042 766"/>
+
+    <!-- Legend -->
+    <g transform="translate(1160,10)">
+      <rect x="0" y="0" width="126" height="28" class="init"/>
+      <text class="tiny" x="63" y="19" text-anchor="middle">启动/硬件</text>
+      <rect x="142" y="0" width="126" height="28" class="fast"/>
+      <text class="tiny" x="205" y="19" text-anchor="middle">快环调度</text>
+      <rect x="284" y="0" width="126" height="28" class="algo"/>
+      <text class="tiny" x="347" y="19" text-anchor="middle">FOC 算法</text>
+      <rect x="426" y="0" width="126" height="28" class="safe"/>
+      <text class="tiny" x="489" y="19" text-anchor="middle">保护/停机</text>
+    </g>
+  </g>
+</svg>

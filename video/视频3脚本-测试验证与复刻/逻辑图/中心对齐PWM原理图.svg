@@ -1,0 +1,92 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900">
+  <defs>
+    <marker id="arrow-dark" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0,0 L10,5 L0,10 Z" fill="#334155"/>
+    </marker>
+    <marker id="arrow-blue" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0,0 L10,5 L0,10 Z" fill="#0876bd"/>
+    </marker>
+  </defs>
+
+  <rect width="1600" height="900" fill="#ffffff"/>
+  <text x="800" y="64" text-anchor="middle" font-family="Microsoft YaHei, Arial" font-size="44" font-weight="700" fill="#0876bd">中心对齐 PWM 原理</text>
+
+  <!-- Counter coordinate system -->
+  <line x1="210" y1="325" x2="210" y2="88" stroke="#334155" stroke-width="3" marker-end="url(#arrow-dark)"/>
+  <line x1="210" y1="325" x2="1480" y2="325" stroke="#334155" stroke-width="3" marker-end="url(#arrow-dark)"/>
+  <text x="72" y="235" transform="rotate(-90 72 235)" font-family="Microsoft YaHei, Arial" font-size="27" font-weight="700" fill="#334155">计数值 CNT</text>
+  <text x="1490" y="337" font-family="Arial" font-size="25" fill="#334155">t</text>
+
+  <!-- ARR / CCR / zero levels -->
+  <line x1="210" y1="110" x2="1460" y2="110" stroke="#cbd5e1" stroke-width="2"/>
+  <line x1="210" y1="205" x2="1460" y2="205" stroke="#f59e0b" stroke-width="4" stroke-dasharray="14 10"/>
+  <text x="140" y="120" font-family="Arial" font-size="27" font-weight="700" fill="#334155">ARR</text>
+  <text x="140" y="214" font-family="Arial" font-size="27" font-weight="700" fill="#d97706">CCR</text>
+  <text x="174" y="334" font-family="Arial" font-size="27" fill="#334155">0</text>
+
+  <!-- Center-aligned up/down counter: two cycles -->
+  <polyline points="250,325 550,110 850,325 1150,110 1450,325" fill="none" stroke="#0876bd" stroke-width="7" stroke-linejoin="round"/>
+  <line x1="330" y1="267" x2="455" y2="177" stroke="#0876bd" stroke-width="3" marker-end="url(#arrow-blue)"/>
+  <line x1="630" y1="167" x2="755" y2="257" stroke="#0876bd" stroke-width="3" marker-end="url(#arrow-blue)"/>
+  <text x="295" y="165" font-family="Microsoft YaHei, Arial" font-size="25" fill="#0876bd">向上计数</text>
+  <text x="650" y="165" font-family="Microsoft YaHei, Arial" font-size="25" fill="#0876bd">向下计数</text>
+
+  <!-- Compare events, mathematically symmetric -->
+  <g stroke="#94a3b8" stroke-width="2" stroke-dasharray="8 8">
+    <line x1="417.4" y1="205" x2="417.4" y2="548"/>
+    <line x1="682.6" y1="205" x2="682.6" y2="548"/>
+    <line x1="1017.4" y1="205" x2="1017.4" y2="548"/>
+    <line x1="1282.6" y1="205" x2="1282.6" y2="548"/>
+  </g>
+  <g fill="#ef4444">
+    <circle cx="417.4" cy="205" r="8"/>
+    <circle cx="682.6" cy="205" r="8"/>
+    <circle cx="1017.4" cy="205" r="8"/>
+    <circle cx="1282.6" cy="205" r="8"/>
+  </g>
+
+  <!-- PWM mode 1 waveform: active when CNT is below CCR -->
+  <text x="55" y="472" font-family="Microsoft YaHei, Arial" font-size="28" font-weight="700" fill="#334155">PWM 输出</text>
+  <text x="55" y="507" font-family="Arial" font-size="21" fill="#64748b">PWM Mode 1</text>
+  <line x1="210" y1="550" x2="1480" y2="550" stroke="#cbd5e1" stroke-width="2" marker-end="url(#arrow-dark)"/>
+  <path d="M250,445 H417.4 V530 H682.6 V445 H1017.4 V530 H1282.6 V445 H1450" fill="none" stroke="#0f766e" stroke-width="8" stroke-linejoin="miter"/>
+  <text x="218" y="432" font-family="Arial" font-size="20" fill="#0f766e">HIGH</text>
+  <text x="218" y="536" font-family="Arial" font-size="20" fill="#64748b">LOW</text>
+
+  <!-- One complete PWM period, peak-to-peak; pulse is centered at CNT=0 -->
+  <line x1="550" y1="95" x2="550" y2="605" stroke="#0876bd" stroke-width="2" stroke-dasharray="6 8" opacity="0.75"/>
+  <line x1="850" y1="95" x2="850" y2="625" stroke="#0876bd" stroke-width="3" stroke-dasharray="8 8"/>
+  <line x1="1150" y1="95" x2="1150" y2="605" stroke="#0876bd" stroke-width="2" stroke-dasharray="6 8" opacity="0.75"/>
+  <line x1="550" y1="595" x2="1150" y2="595" stroke="#0876bd" stroke-width="3"/>
+  <line x1="550" y1="582" x2="550" y2="608" stroke="#0876bd" stroke-width="3"/>
+  <line x1="1150" y1="582" x2="1150" y2="608" stroke="#0876bd" stroke-width="3"/>
+  <text x="850" y="632" text-anchor="middle" font-family="Microsoft YaHei, Arial" font-size="27" font-weight="700" fill="#0876bd">一个 PWM 周期</text>
+  <text x="850" y="372" text-anchor="middle" font-family="Microsoft YaHei, Arial" font-size="24" font-weight="700" fill="#0876bd">周期中心：CNT = 0</text>
+
+  <!-- Symmetry indicators for switching edges in the selected period -->
+  <line x1="682.6" y1="574" x2="845" y2="574" stroke="#ef4444" stroke-width="3" marker-end="url(#arrow-dark)"/>
+  <line x1="1017.4" y1="574" x2="855" y2="574" stroke="#ef4444" stroke-width="3" marker-end="url(#arrow-dark)"/>
+  <text x="850" y="565" text-anchor="middle" font-family="Microsoft YaHei, Arial" font-size="23" fill="#ef4444">两侧时间相等</text>
+  <text x="682.6" y="420" text-anchor="middle" font-family="Microsoft YaHei, Arial" font-size="22" fill="#ef4444">上升沿</text>
+  <text x="1017.4" y="420" text-anchor="middle" font-family="Microsoft YaHei, Arial" font-size="22" fill="#ef4444">下降沿</text>
+
+  <!-- Three compact principle cards -->
+  <g>
+    <rect x="120" y="675" width="400" height="118" rx="14" fill="#eef7fc" stroke="#7cc3ea" stroke-width="2"/>
+    <text x="320" y="715" text-anchor="middle" font-family="Microsoft YaHei, Arial" font-size="27" font-weight="700" fill="#0876bd">① 上下计数</text>
+    <text x="320" y="758" text-anchor="middle" font-family="Microsoft YaHei, Arial" font-size="25" fill="#334155">0 → ARR → 0</text>
+  </g>
+  <g>
+    <rect x="600" y="675" width="400" height="118" rx="14" fill="#fff7e6" stroke="#f6bd60" stroke-width="2"/>
+    <text x="800" y="715" text-anchor="middle" font-family="Microsoft YaHei, Arial" font-size="27" font-weight="700" fill="#d97706">② 两次比较</text>
+    <text x="800" y="758" text-anchor="middle" font-family="Microsoft YaHei, Arial" font-size="25" fill="#334155">上、下计数各一次 CNT = CCR</text>
+  </g>
+  <g>
+    <rect x="1080" y="675" width="400" height="118" rx="14" fill="#effaf5" stroke="#6fcf97" stroke-width="2"/>
+    <text x="1280" y="715" text-anchor="middle" font-family="Microsoft YaHei, Arial" font-size="27" font-weight="700" fill="#0f766e">③ 对称开关</text>
+    <text x="1280" y="758" text-anchor="middle" font-family="Microsoft YaHei, Arial" font-size="25" fill="#334155">两个开关沿关于周期中心对称</text>
+  </g>
+
+  <rect x="300" y="820" width="1000" height="54" rx="12" fill="#0876bd"/>
+  <text x="800" y="856" text-anchor="middle" font-family="Microsoft YaHei, Arial" font-size="27" font-weight="700" fill="#ffffff">PWM频率 = 定时器时钟 ÷ [2 × (ARR + 1)]　　占空比 D ≈ CCR ÷ ARR</text>
+</svg>
