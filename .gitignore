@@ -15,9 +15,16 @@
 # Keil user-specific files
 *.uvguix.*
 *.uvoptx
+JLinkLog.txt
+JLinkSettings.ini
 
 # Office temp files
 ~$*
+~WRL*.tmp
+*.bkp
+
+# Third-party installer binaries
+*.exe
 
 # Optional build/log folders
 Objects/

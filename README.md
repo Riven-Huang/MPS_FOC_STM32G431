@@ -293,20 +293,20 @@ const volatile program_telemetry_t *program_get_telemetry(void);
 
 当前项目没有另外封装一层命令协议，调试和 bring-up 默认直接通过 `g_motor` 或 `program_get_motor()` 写入控制量。常用写入项如下：
 
-| 写入变量                                     | 单位 / 取值 | 作用                               |
-| ---------------------------------------- | ------- | -------------------------------- |
-| `g_motor.run_request`                    | `0 / 1` | 总运行使能；置 `1` 后状态机才允许对齐、使能功率级并开始发波 |
-| `g_motor.current_loop_enable`            | `0 / 1` | `0` 为开环电压模式，`1` 为电流环模式           |
-| `g_motor.speed_loop_enable`              | `0 / 1` | `1` 时速度环接管转矩给定                   |
-| `g_motor.position_loop_enable`           | `0 / 1` | `1` 时位置环输出速度参考，需同时开启速度环          |
-| `g_motor.control_angle_open_loop_enable` | `0 / 1` | `1` 时改为开环生成电角度，不使用 `MA600A` 闭环角度 |
-| `g_motor.ud_ref` / `g_motor.uq_ref`      | V       | 开环电压模式直接给定 `d/q` 轴电压             |
-| `g_motor.speed_ref_mech_rpm`             | rpm     | 速度环目标机械转速                        |
-| `g_motor.position_ref_mech_deg`          | deg     | 位置环目标机械角度；推荐作为唯一外部位置指令入口         |
-| `g_motor.iq_limit`                       | A       | 电流 / 转矩限幅                        |
-| `g_motor.speed_kp` / `g_motor.speed_ki`  | -       | 速度环参数                            |
-| `g_motor.position_kp`                    | -       | 位置环比例参数                          |
-| `g_program_debug_pwm_test.enable`        | `0 / 1` | 固定占空比 PWM 发波测试开关；`1` 时快环直接接管三相占空比输出 |
+| 写入变量                                     | 单位 / 取值 | 作用                                        |
+| ---------------------------------------- | ------- | ----------------------------------------- |
+| `g_motor.run_request`                    | `0 / 1` | 总运行使能；置 `1` 后状态机才允许对齐、使能功率级并开始发波          |
+| `g_motor.current_loop_enable`            | `0 / 1` | `0` 为开环电压模式，`1` 为电流环模式                    |
+| `g_motor.speed_loop_enable`              | `0 / 1` | `1` 时速度环接管转矩给定                            |
+| `g_motor.position_loop_enable`           | `0 / 1` | `1` 时位置环输出速度参考，需同时开启速度环                   |
+| `g_motor.control_angle_open_loop_enable` | `0 / 1` | `1` 时改为开环生成电角度，不使用 `MA600A` 闭环角度          |
+| `g_motor.ud_ref` / `g_motor.uq_ref`      | V       | 开环电压模式直接给定 `d/q` 轴电压                      |
+| `g_motor.speed_ref_mech_rpm`             | rpm     | 速度环目标机械转速                                 |
+| `g_motor.position_ref_mech_deg`          | deg     | 位置环目标机械角度；推荐作为唯一外部位置指令入口                  |
+| `g_motor.iq_limit`                       | A       | 电流 / 转矩限幅                                 |
+| `g_motor.speed_kp` / `g_motor.speed_ki`  | -       | 速度环参数                                     |
+| `g_motor.position_kp`                    | -       | 位置环比例参数                                   |
+| `g_program_debug_pwm_test.enable`        | `0 / 1` | 固定占空比 PWM 发波测试开关；`1` 时快环直接接管三相占空比输出       |
 | `g_program_debug_pwm_test.duty_a/b/c`    | `0~1`   | A/B/C 三相固定占空比；默认初始化为 `0.30 / 0.40 / 0.60` |
 
 ### 6.4 软件观测接口

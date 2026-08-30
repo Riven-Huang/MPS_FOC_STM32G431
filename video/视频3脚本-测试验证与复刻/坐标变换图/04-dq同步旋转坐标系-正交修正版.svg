@@ -1,0 +1,58 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1000" viewBox="0 0 1600 1000">
+  <defs>
+    <marker id="g" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+      <path d="M0,0 L10,5 L0,10 Z" fill="#7b8491"/>
+    </marker>
+    <marker id="r" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+      <path d="M0,0 L10,5 L0,10 Z" fill="#d62828"/>
+    </marker>
+    <marker id="k" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+      <path d="M0,0 L10,5 L0,10 Z" fill="#111827"/>
+    </marker>
+    <marker id="b" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+      <path d="M0,0 L10,5 L0,10 Z" fill="#1769c2"/>
+    </marker>
+    <marker id="v" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+      <path d="M0,0 L10,5 L0,10 Z" fill="#138a4b"/>
+    </marker>
+  </defs>
+
+  <rect width="1600" height="1000" fill="#ffffff"/>
+
+  <!-- Stationary alpha-beta frame, origin O=(620,760). -->
+  <line x1="620" y1="760" x2="1450" y2="760" stroke="#7b8491" stroke-width="4" marker-end="url(#g)"/>
+  <line x1="620" y1="760" x2="620" y2="80" stroke="#7b8491" stroke-width="4" marker-end="url(#g)"/>
+  <text x="1470" y="782" font-family="Times New Roman" font-style="italic" font-size="58" fill="#7b8491">α</text>
+  <text x="585" y="70" font-family="Times New Roman" font-style="italic" font-size="58" fill="#7b8491">β</text>
+
+  <!-- Exact 90-degree sector: d=30 degrees, q=120 degrees. -->
+  <path d="M620,760 L715.3,705 A110,110 0 0 0 565,664.7 Z" fill="#ffe8e8" stroke="#d62828" stroke-width="4"/>
+  <text x="595" y="676" font-family="Arial" font-size="34" font-weight="700" fill="#d62828">90°</text>
+
+  <!-- Rotating d-q axes, exactly perpendicular. -->
+  <line x1="620" y1="760" x2="1295.5" y2="370" stroke="#d62828" stroke-width="6" marker-end="url(#r)"/>
+  <line x1="620" y1="760" x2="280" y2="171.1" stroke="#d62828" stroke-width="6" marker-end="url(#r)"/>
+  <text x="1310" y="368" font-family="Times New Roman" font-style="italic" font-size="62" fill="#d62828">d</text>
+  <text x="238" y="160" font-family="Times New Roman" font-style="italic" font-size="62" fill="#d62828">q</text>
+
+  <!-- Electrical angle from alpha to d. -->
+  <path d="M810,760 A190,190 0 0 0 784.5,665" fill="none" stroke="#111827" stroke-width="4" marker-end="url(#k)"/>
+  <text x="810" y="684" font-family="Times New Roman" font-style="italic" font-size="50" fill="#111827">θ</text>
+  <text x="848" y="701" font-family="Times New Roman" font-style="italic" font-size="32" fill="#111827">e</text>
+
+  <!-- Stator current vector. -->
+  <line x1="620" y1="760" x2="821.8" y2="205.6" stroke="#111827" stroke-width="7" marker-end="url(#k)"/>
+  <text x="842" y="205" font-family="Times New Roman" font-style="italic" font-size="52" fill="#111827">i</text>
+  <text x="870" y="222" font-family="Times New Roman" font-style="italic" font-size="32" fill="#111827">s</text>
+
+  <!-- Orthogonal components: i_d lies on d; i_q is parallel to q. -->
+  <line x1="715.3" y1="705" x2="1011.4" y2="534" stroke="#1769c2" stroke-width="7" marker-end="url(#b)"/>
+  <text x="875" y="628" font-family="Times New Roman" font-style="italic" font-size="50" fill="#1769c2">i</text>
+  <text x="903" y="645" font-family="Times New Roman" font-style="italic" font-size="32" fill="#1769c2">d</text>
+
+  <line x1="1011.4" y1="534" x2="821.8" y2="205.6" stroke="#138a4b" stroke-width="7" marker-end="url(#v)"/>
+  <text x="980" y="360" font-family="Times New Roman" font-style="italic" font-size="50" fill="#138a4b">i</text>
+  <text x="1008" y="377" font-family="Times New Roman" font-style="italic" font-size="32" fill="#138a4b">q</text>
+
+  <circle cx="620" cy="760" r="9" fill="#111827"/>
+</svg>
