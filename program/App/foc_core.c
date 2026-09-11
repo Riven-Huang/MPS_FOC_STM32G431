@@ -130,7 +130,7 @@ void foc_core_set_electrical_angle(foc_core_t *core, float theta_elec)
 /* 函数作用：执行 Clarke 变换。
  * 输入：ia/ib/ic 为三相电流，单位 A。
  * 输出：out 中得到 alpha-beta 坐标电流。
- * 调用频率：当前约 1 kHz，后续应放到电流快环。
+ * 调用频率：10 kHz 快环每拍一次。
  * 运行内容：把三相静止坐标量映射到两相 alpha-beta 坐标。 */
 void foc_core_clarke(float ia, float ib, foc_alpha_beta_t *out)
 {
@@ -146,7 +146,7 @@ void foc_core_clarke(float ia, float ib, foc_alpha_beta_t *out)
 /* 函数作用：执行 Park 变换。
  * 输入：ab 为 alpha-beta 坐标量，sin_theta/cos_theta 为当前角度正余弦。
  * 输出：out 中得到 dq 坐标量。
- * 调用频率：当前约 1 kHz，后续应放到电流快环。
+ * 调用频率：10 kHz 快环每拍一次。
  * 运行内容：把静止坐标量变换到同步旋转坐标系。 */
 void foc_core_park(const foc_alpha_beta_t *ab, float sin_theta, float cos_theta, foc_dq_t *out)
 {
@@ -225,23 +225,19 @@ void foc_core_svpwm(foc_core_t *core, float v_alpha, float v_beta, float vbus)
     core->duty.duty_c = foc_core_clamp(vc_norm + offset, 0.0f, 1.0f);
 }
 
-/* 函数作用：执行一次开环电压模式 FOC 输出。
- * 输入：core 为 FOC 对象，ud/uq 为 dq 电压命令，theta_elec 为目标电角度，vbus 为母线电压。
+/* 函数作用：把 dq 电压命令应用到三相占空比。
+ * 输入：core 为 FOC 对象（sin/cos 须已由本拍的 set_electrical_angle 缓存好），
+ *      ud/uq 为 dq 电压命令，vbus 为母线电压。
  * 输出：更新 core 内的 dq/ab 电压命令以及三相占空比。
- * 调用频率：当前由状态机约 1 kHz 调用。
- * 运行内容：更新母线和角度，执行反 Park，再用 SVPWM 生成三相占空比。 */
-void foc_core_run_voltage_open_loop(foc_core_t *core,
-                                    float ud,
-                                    float uq,
-                                    float theta_elec,
-                                    float vbus)
+ * 调用频率：10 kHz 快环每拍一次。
+ * 运行内容：更新母线，执行反 Park（复用缓存 sin/cos），再用 SVPWM 生成三相占空比。 */
+void foc_core_apply_voltage(foc_core_t *core, float ud, float uq, float vbus)
 {
     if (core == 0) {
         return;
     }
 
     foc_core_set_bus_voltage(core, vbus);
-    foc_core_set_electrical_angle(core, theta_elec);
 
     core->v_dq_cmd.d = ud;
     core->v_dq_cmd.q = uq;

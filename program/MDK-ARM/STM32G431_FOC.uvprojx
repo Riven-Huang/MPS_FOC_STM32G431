@@ -504,14 +504,14 @@
               <FilePath>../App/program.c</FilePath>
             </File>
             <File>
-              <FileName>motor_state.c</FileName>
+              <FileName>board.c</FileName>
               <FileType>1</FileType>
-              <FilePath>../App/motor_state.c</FilePath>
+              <FilePath>../App/board.c</FilePath>
             </File>
             <File>
-              <FileName>drv_pid.c</FileName>
+              <FileName>motor_ctrl.c</FileName>
               <FileType>1</FileType>
-              <FilePath>../App/drv_pid.c</FilePath>
+              <FilePath>../App/motor_ctrl.c</FilePath>
             </File>
             <File>
               <FileName>filter.c</FileName>

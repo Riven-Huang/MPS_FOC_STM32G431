@@ -43,10 +43,9 @@ void foc_core_park(const foc_alpha_beta_t *ab, float sin_theta, float cos_theta,
 void foc_core_inv_park(const foc_dq_t *dq, float sin_theta, float cos_theta, foc_alpha_beta_t *out);
 void foc_core_svpwm(foc_core_t *core, float v_alpha, float v_beta, float vbus);
 
-void foc_core_run_voltage_open_loop(foc_core_t *core,
-                                    float ud,
-                                    float uq,
-                                    float theta_elec,
-                                    float vbus);
+/* 应用 dq 电压到三相占空比（反 Park + SVPWM）。
+ * 约定：调用前本拍必须先 foc_core_set_electrical_angle()，
+ *       本函数复用已缓存的 sin/cos，不再重复计算角度。 */
+void foc_core_apply_voltage(foc_core_t *core, float ud, float uq, float vbus);
 
 #endif /* FOC_CORE_H */
