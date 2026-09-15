@@ -2,6 +2,8 @@
 
 这份文档给出从烧录、静态自检、功率级发波验证到电流环、速度环、位置环闭环整定的操作顺序，以及每一步的判据变量和异常处理方向。项目概览见根目录 [`README.md`](../README.md)。
 
+当前故障清除实现的限制、三环小步进测试及 5 路 VOFA 通道表见 [`program 故障定位与调试`](program-debug.md)。首次位置测试采用其中较低的速度上限，待稳定后再提高到本文所列默认值。
+
 更换电机、减速器或编码器安装方式时，先按 [`适配新电机标准流程.docx`](./适配新电机标准流程.docx) 完成参数辨识与配置，再回到本文执行闭环调试。
 
 ## 1. 控制接口与调试方法
@@ -38,7 +40,7 @@
 - 控制链 — `g_fb.state`、`g_fb.mode_active`、`g_fb.align_done`、`g_fb.align_ofs_rad`、`g_fb.theta_elec_rad`、`g_fb.id_a`、`g_fb.iq_a`、`g_fb.duty_a/b/c`
 - 给定与实时性 — `g_cmd.mode`、`g_cmd.run`、`g_cmd.id_a`、`g_cmd.iq_a`、`g_cmd.ud_v`、`g_cmd.uq_v`、`g_cmd.spd_rpm`、`g_cmd.pos_deg`、`g_fb.id_ref_a`、`g_fb.iq_ref_a`、`g_fb.spd_ref_rpm`、`g_fb.loop_us`、`g_fb.overrun_cnt`
 
-VOFA 遥测共 7 路、`100 Hz`，依次为三相电流、母线电压、输出轴转速、输出轴位置、快环耗时。
+VOFA 遥测共 5 路、约 `333 Hz`（3 ms），依次为两轴实际电流、输出轴转速、输出轴位置、编码器机械角；通道定义见 `program-debug.md`。
 
 ## 3. 烧录与静态自检
 
@@ -97,7 +99,7 @@ g_cmd.run = 1;
 
 启动后状态机依次执行：
 
-1. IDLE → ALIGN：以 `1.8 V` 的 d 轴电压锁定转子
+1. IDLE → ALIGN：以 `CFG_ALIGN_UD_V`（默认 `1.2 V`）的 d 轴电压锁定转子
 2. 保持 8000 个快环节拍，约 0.8 s
 3. 在末段 512 拍对编码器电角度做正弦/余弦平均，得到零位偏置 `g_fb.align_ofs_rad`
 4. 进入 RUN，按编码器角度执行手动 d/q 电压输出

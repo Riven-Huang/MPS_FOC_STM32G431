@@ -60,7 +60,7 @@ void cli_uart_send_text(const char *text)
 /* 函数作用：按 VOFA JustFloat 协议发送一帧二进制浮点数据。
  * 输入：values 为待发送浮点数组首地址，count 为通道数量。
  * 输出：返回 1 表示本次已成功启动 DMA 发送，返回 0 表示串口忙或缓冲区不足。
- * 调用频率：后台任务中按固定节拍调用，当前工程约 50 Hz。
+ * 调用频率：后台任务中按固定节拍调用，当前工程约 333 Hz。
  * 运行内容：把 float 数组按 STM32 小端字节序直接拷入发送缓冲区，再追加
  * VOFA 帧尾 {0x00,0x00,0x80,0x7F}，最后启动 UART DMA 非阻塞发送。 */
 uint8_t cli_uart_send_vofa(const float *values, uint8_t count)
