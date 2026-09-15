@@ -80,7 +80,7 @@
  *   速度环带宽上限约 60Hz，30Hz 有充足裕度。
  * 电流环 PI（对象 R/L 串联模型，模最佳整定）：
  *   Kp = 2π·bw·L，Ki = 2π·bw·R（等效对象参数见 README 9.2） */
-#define CFG_CUR_BW_HZ_DEFAULT       500.0f
+#define CFG_CUR_BW_HZ_DEFAULT       250.0f
 #define CFG_CUR_EQ_R_OHM            0.7250f
 #define CFG_CUR_EQ_L_H              0.0004100f
 
@@ -88,12 +88,12 @@
  *   Kp = 2ζ·ωn·J/Kt，Ki = ωn²·J/Kt   （机械 rad/s 域）
  *   代码内 PI 在电角速度域运行（给定/反馈同乘极对数），增益需再除以极对数。
  *   当前：ωn=2π×30，Kp≈0.01346，Ki≈1.26895 */
-#define CFG_SPD_BW_HZ_DEFAULT       30.0f
+#define CFG_SPD_BW_HZ_DEFAULT       10.0f
 #define CFG_SPD_DAMPING             1.0f
 
 /* 位置环 P（内环 30Hz 快于本环，对象近似纯积分 1/s）：
  *   Kp = 2π·bw（输出轴 rad 域），当前：2π×5 ≈ 31.42 */
-#define CFG_POS_BW_HZ_DEFAULT       5.0f
+#define CFG_POS_BW_HZ_DEFAULT       2.0f
 
 /* ---------------- 位置环 hold/creep（抑制静摩擦导致的低频抖动） ---------------- */
 #define CFG_POS_HOLD_ERR_RAD        0.021f      /* 进入保持：|误差| < ~1.2° */
@@ -104,7 +104,9 @@
 #define CFG_POS_CREEP_SPD_RAD_S     0.020f
 
 /* ---------------- 编码器对齐（零位辨识） ---------------- */
-#define CFG_ALIGN_UD_V              1.8f        /* 对齐用 d 轴电压 */
+#define CFG_ALIGN_UD_V              1.2f        /* 对齐用 d 轴电压。align 期间不受 iq_lim_a 限制，
+                                                 * 电流只由相电阻决定：1.8V 实测约 5.5A(≈10W) 纯铜耗，
+                                                 * 降到 1.2V 约 3.7A；若转子锁不住再按 1.35/1.5 逐步回加 */
 #define CFG_ALIGN_HOLD_TICKS        8000U       /* 对齐保持快环拍数 ≈ 0.8s */
 #define CFG_ALIGN_SAMPLE_TICKS      512U        /* 末段采样窗口 */
 
@@ -132,7 +134,7 @@
 #define CFG_ENC_RENORM_RAD          (32.0f * 6.28318530718f)  /* 连续角归一化阈值 */
 
 /* ---------------- 遥测 ---------------- */
-#define CFG_VOFA_PERIOD_MS          10U         /* VOFA 发送周期 10ms = 100Hz */
+#define CFG_VOFA_PERIOD_MS          3U          /* 5 路 VOFA，3ms ≈ 333Hz；115200 下每帧约 2.08ms */
 #define CFG_VBUS_LPF_HZ             50.0f       /* 1kHz 更新时 alpha≈0.2696 */
 
 #endif /* APP_CONFIG_H */

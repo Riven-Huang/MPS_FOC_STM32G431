@@ -22,6 +22,7 @@
 
 /* ADC2 DMA 缓冲：CH0=VBUS，CH1=NTC */
 #define ADC2_DMA_LEN    2U
+#define VOFA_CHANNEL_COUNT 5U
 
 static volatile uint16_t s_adc2_buf[ADC2_DMA_LEN];
 static volatile uint32_t s_tick_ms;
@@ -101,24 +102,28 @@ void program_init(void)
 void program_task(void)
 {
     uint32_t now_ms = s_tick_ms;
-    float vofa_buf[7];
+    uint32_t primask;
+    float vofa_buf[VOFA_CHANNEL_COUNT];
 
-    /* VOFA JustFloat 遥测，100Hz：
-     * ch0~2 = 三相电流 A，ch3 = 母线电压 V，ch4 = 输出轴转速 rpm，
-     * ch5 = 输出轴位置 deg，ch6 = 快环耗时 us（预算 100us） */
+    /* VOFA JustFloat，约 333Hz，5 路 + 帧尾 = 24 字节。
+     * 115200 8N1 下每帧约 2.08ms，发送周期 3ms。 */
     if ((now_ms - s_last_vofa_ms) < CFG_VOFA_PERIOD_MS) {
         return;
     }
     s_last_vofa_ms = now_ms;
 
-    vofa_buf[0] = g_fb.ia_a;
-    vofa_buf[1] = g_fb.ib_a;
-    vofa_buf[2] = g_fb.ic_a;
-    vofa_buf[3] = g_fb.vbus_v;
-    vofa_buf[4] = g_fb.spd_out_rpm;
-    vofa_buf[5] = g_fb.pos_out_deg;
-    vofa_buf[6] = g_fb.loop_us;
-    (void)cli_uart_send_vofa(vofa_buf, 7U);
+    /* 短临界区只复制反馈，避免快环打断造成一帧内反馈跨拍。
+     * 保留原中断屏蔽状态；UART DMA 发送在恢复中断后进行。
+     * 慢速派生量仍按原有 1kHz 节拍更新。 */
+    primask = __get_PRIMASK();
+    __disable_irq();
+    vofa_buf[0] = g_fb.id_a;          /* d 轴实际电流 A */
+    vofa_buf[1] = g_fb.iq_a;          /* q 轴实际电流 A */
+    vofa_buf[2] = g_fb.spd_out_rpm;   /* 输出轴转速 rpm */
+    vofa_buf[3] = g_fb.pos_out_deg;   /* 输出轴位置 deg，0~360 */
+    vofa_buf[4] = g_fb.enc_deg;       /* 编码器机械角 deg，0~360 */
+    __set_PRIMASK(primask);
+    (void)cli_uart_send_vofa(vofa_buf, VOFA_CHANNEL_COUNT);
 }
 
 /* -------------------------------- HAL 回调转发（弱符号覆盖，CubeMX 安全） -------------------------------- */

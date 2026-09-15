@@ -169,7 +169,7 @@
 - 位置环 — `200 Hz`，快环内按 `CFG_POS_DT_S` 分频
 - 慢任务 — `1 kHz`，快环内 `CFG_SLOW_DIV = 10` 分频：母线/NTC 换算、过压欠压锁存、派生单位
 - 母线/NTC 采样 — `1 kHz`，`TIM6 TRGO → ADC2 + DMA`
-- 后台遥测 — `100 Hz`，`while(1)` 中的 `program_task()`；VOFA JustFloat 共 7 路：三相电流、母线电压、输出轴转速、输出轴位置、快环耗时
+- 后台遥测 — 约 `333 Hz`（3 ms），`while(1)` 中的 `program_task()`；VOFA JustFloat 共 5 路：两轴实际电流、输出轴转速、输出轴位置、编码器机械角，详见 [`docs/program-debug.md`](docs/program-debug.md#4-新-vofa-通道表)
 
 ---
 
@@ -263,7 +263,7 @@ extern volatile motor_fb_t  g_fb;    /* 用户读：状态、故障、全部测�
 
 `MA600A` 通过 `SPI1` 读取 16 bit 绝对角度，由快环每拍发起一次非阻塞传输。驱动对相邻样本做跳变检查：单帧角度变化超过 1024 个计数（约 5.6° 机械角）判为非法样本，连续 4 次坏样本后将 `data_valid` 清零并锁存编码器故障。
 
-闭环类模式启动时执行零位对齐：以 1.8 V 的 d 轴电压将转子锁定在电角度 0 位置，保持 `CFG_ALIGN_HOLD_TICKS = 8000` 个快环节拍（约 0.8 s），并在末段 512 拍对编码器电角度做正弦/余弦平均，得到零位偏置 `g_fb.align_ofs_rad`。
+闭环类模式启动时执行零位对齐：以 `CFG_ALIGN_UD_V`（默认 1.2 V）的 d 轴电压将转子锁定在电角度 0 位置，保持 `CFG_ALIGN_HOLD_TICKS = 8000` 个快环节拍（约 0.8 s），并在末段 512 拍对编码器电角度做正弦/余弦平均，得到零位偏置 `g_fb.align_ofs_rad`。该电压不受 `iq_lim_a` 限制，对齐电流只由相电阻决定，电压越高纯铜耗越大。
 
 机构换算集中在 [`program/App/units.h`](program/App/units.h)：编码器机械角经方向符号与减速比换算为转子机械角，再乘以极对数得到电角度；输出轴量由转子量除以减速比得到。
 
@@ -342,6 +342,8 @@ extern volatile motor_fb_t  g_fb;    /* 用户读：状态、故障、全部测�
 ## 8. 上电调试
 
 完整的上电自检与三环整定步骤见 [`docs/quick-start.md`](docs/quick-start.md)，这里只列关键顺序与判据。
+
+当前程序的故障触发条件、清除流程、三环小步进测试及新版 VOFA 通道见 [`program 调试说明`](docs/program-debug.md)。
 
 开发环境为 Keil MDK，工程文件 [`program/MDK-ARM/STM32G431_FOC.uvprojx`](program/MDK-ARM/STM32G431_FOC.uvprojx)，CubeMX 工程 [`program/STM32G431_FOC.ioc`](program/STM32G431_FOC.ioc)，下载器 CMSIS-DAP。
 
