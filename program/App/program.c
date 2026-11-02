@@ -15,6 +15,7 @@
 #include "app_config.h"
 #include "board.h"
 #include "cli_uart.h"
+#include "host_link.h"
 #include "motor_ctrl.h"
 #include "spi.h"
 #include "tim.h"
@@ -90,6 +91,7 @@ void program_init(void)
     }
 
     cli_uart_init(&huart1);
+    host_link_init();
 
     program_start_slow_chain();
     program_start_fast_chain();
@@ -104,6 +106,10 @@ void program_task(void)
     uint32_t now_ms = s_tick_ms;
     uint32_t primask;
     float vofa_buf[VOFA_CHANNEL_COUNT];
+
+    if (host_link_task(now_ms)) {
+        return;
+    }
 
     /* VOFA JustFloat，约 333Hz，5 路 + 帧尾 = 24 字节。
      * 115200 8N1 下每帧约 2.08ms，发送周期 3ms。 */
@@ -155,6 +161,7 @@ void HAL_ADCEx_InjectedConvCpltCallback(ADC_HandleTypeDef *hadc)
     ib_raw = (uint16_t)HAL_ADCEx_InjectedGetValue(hadc, ADC_INJECTED_RANK_2);
     ic_raw = (uint16_t)HAL_ADCEx_InjectedGetValue(hadc, ADC_INJECTED_RANK_3);
 
+    host_link_control_tick(s_tick_ms);
     ctrl_fast_loop(ia_raw, ib_raw, ic_raw,
                    (uint16_t)s_adc2_buf[0], (uint16_t)s_adc2_buf[1]);
 }

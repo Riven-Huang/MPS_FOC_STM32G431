@@ -2,7 +2,8 @@
 
 #include <string.h>
 
-#define CLI_UART_TX_BUF_SIZE    96U
+#define CLI_UART_TX_BUF_SIZE    192U
+#define CLI_UART_RX_BUF_SIZE    256U
 #define CLI_UART_VOFA_TAIL_SIZE 4U
 
 static const uint8_t g_cli_uart_vofa_tail[CLI_UART_VOFA_TAIL_SIZE] = {0x00U, 0x00U, 0x80U, 0x7FU};
@@ -10,6 +11,11 @@ static const uint8_t g_cli_uart_vofa_tail[CLI_UART_VOFA_TAIL_SIZE] = {0x00U, 0x0
 static UART_HandleTypeDef *g_cli_uart = 0;
 static volatile uint8_t g_cli_uart_tx_busy = 0U;
 static uint8_t g_cli_uart_tx_buf[CLI_UART_TX_BUF_SIZE];
+static uint8_t s_rx_byte;
+static uint8_t s_rx_buf[CLI_UART_RX_BUF_SIZE];
+static volatile uint16_t s_rx_head;
+static volatile uint16_t s_rx_tail;
+static volatile uint8_t s_rx_overflow;
 
 /* 函数作用：初始化调试串口发送模块。
  * 输入：huart 为要绑定的 UART 句柄，通常传入 USART1 句柄。
@@ -20,6 +26,72 @@ void cli_uart_init(UART_HandleTypeDef *huart)
 {
     g_cli_uart = huart;
     g_cli_uart_tx_busy = 0U;
+    s_rx_head = 0U;
+    s_rx_tail = 0U;
+    s_rx_overflow = 0U;
+    cli_uart_poll_rx();
+}
+
+/* IRQ only queues bytes. Parsing and TX remain in the background. */
+void cli_uart_poll_rx(void)
+{
+    if ((g_cli_uart != 0) && (g_cli_uart->RxState == HAL_UART_STATE_READY)) {
+        (void)HAL_UART_Receive_IT(g_cli_uart, &s_rx_byte, 1U);
+    }
+}
+
+void cli_uart_rx_flush(void)
+{
+    uint32_t primask = __get_PRIMASK();
+    __disable_irq();
+    s_rx_tail = s_rx_head;
+    s_rx_overflow = 0U;
+    __set_PRIMASK(primask);
+}
+
+uint8_t cli_uart_read_byte(uint8_t *value)
+{
+    if ((value == 0) || (s_rx_head == s_rx_tail)) {
+        return 0U;
+    }
+    if (s_rx_overflow != 0U) {
+        cli_uart_rx_flush();
+        return 0U;
+    }
+    *value = s_rx_buf[s_rx_tail];
+    s_rx_tail = (s_rx_tail + 1U) % CLI_UART_RX_BUF_SIZE;
+    return 1U;
+}
+
+void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
+{
+    uint16_t next;
+    if (huart != g_cli_uart) {
+        return;
+    }
+    next = (s_rx_head + 1U) % CLI_UART_RX_BUF_SIZE;
+    if (next == s_rx_tail) {
+        s_rx_overflow = 1U;
+    } else {
+        s_rx_buf[s_rx_head] = s_rx_byte;
+        s_rx_head = next;
+    }
+    (void)HAL_UART_Receive_IT(g_cli_uart, &s_rx_byte, 1U);
+}
+
+uint8_t cli_uart_send_bytes(const uint8_t *data, uint16_t len)
+{
+    if ((g_cli_uart == 0) || (data == 0) || (len == 0U) ||
+        (len > CLI_UART_TX_BUF_SIZE) || (g_cli_uart_tx_busy != 0U)) {
+        return 0U;
+    }
+    memcpy(g_cli_uart_tx_buf, data, len);
+    g_cli_uart_tx_busy = 1U;
+    if (HAL_UART_Transmit_DMA(g_cli_uart, g_cli_uart_tx_buf, len) != HAL_OK) {
+        g_cli_uart_tx_busy = 0U;
+        return 0U;
+    }
+    return 1U;
 }
 
 /* 函数作用：查询当前串口 DMA 发送是否忙。
@@ -116,6 +188,10 @@ void HAL_UART_TxCpltCallback(UART_HandleTypeDef *huart)
 void HAL_UART_ErrorCallback(UART_HandleTypeDef *huart)
 {
     if ((g_cli_uart != 0) && (huart == g_cli_uart)) {
-        g_cli_uart_tx_busy = 0U;
+        /* RX noise must not release a still-active TX DMA buffer. */
+        if (huart->gState == HAL_UART_STATE_READY) {
+            g_cli_uart_tx_busy = 0U;
+        }
+        cli_uart_poll_rx();
     }
 }

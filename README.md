@@ -49,6 +49,7 @@
 ├── datasheet/               # 器件手册
 ├── docs/                    # 上电调试说明、电机参数表、新电机适配流程
 ├── figure/                  # README 配图：实物、平台、测试曲线、热像
+├── host_app/                # Windows 串口上位机：带宽调参、实时波形、模式控制
 ├── program/
 │   ├── STM32G431_FOC.ioc    # CubeMX 工程
 │   ├── Core/                # HAL 初始化、中断、外设配置
@@ -131,7 +132,7 @@
 ### 3.2 通信外设配置
 
 - `SPI1` — 主机、16 bit、`CPOL=1`、`CPHA=2EDGE`、软 NSS、分频 8，专用 `MA600A` 角度读取
-- `USART1` — `115200 8N1`、无流控、TX DMA，输出 VOFA JustFloat 遥测；RX 已预留但未实现上位机命令协议
+- `USART1` — `115200 8N1`、TX DMA、RX 中断。上电默认输出 5 路 VOFA JustFloat；连接本项目上位机后切换到带 CRC、回执和状态回读的 FOC Serial v1 协议
 - `FDCAN1` — 保留 CubeMX 默认初始化参数，未作为稳定外部接口开放
 - `TIM6 + ADC2 DMA` — `1 kHz`，触发母线电压/NTC 采样并驱动 1 ms 系统节拍
 
@@ -157,7 +158,8 @@
 - `program/App/foc_core.c` — Clarke / Park / 反 Park / SVPWM，缓存 `sin/cos`
 - `program/App/ma600a.c` — MA600A SPI 驱动：非阻塞读角、跳变剔除、通讯错误统计
 - `program/App/filter.c` — 一阶低通滤波器
-- `program/App/cli_uart.c` — UART 文本与 VOFA JustFloat 发送
+- `program/App/cli_uart.c` — UART DMA 发送与接收环形缓冲
+- `program/App/host_link.c` — 上位机协议、参数校验、带宽到 PI 换算及远程运行超时停机
 
 ### 4.2 执行上下文与频率
 
@@ -344,6 +346,8 @@ extern volatile motor_fb_t  g_fb;    /* 用户读：状态、故障、全部测�
 完整的上电自检与三环整定步骤见 [`docs/quick-start.md`](docs/quick-start.md)，这里只列关键顺序与判据。
 
 当前程序的故障触发条件、清除流程、三环小步进测试及新版 VOFA 通道见 [`program 调试说明`](docs/program-debug.md)。
+
+串口上位机见 [`host_app/README.md`](host_app/README.md)：通过带宽调参并显示实际 PI，按模式开放目标输入，显示 5 路实时波形并支持 CSV 导出。先烧录配套固件再连接；参数只写 RAM，复位恢复编译默认值。
 
 开发环境为 Keil MDK，工程文件 [`program/MDK-ARM/STM32G431_FOC.uvprojx`](program/MDK-ARM/STM32G431_FOC.uvprojx)，CubeMX 工程 [`program/STM32G431_FOC.ioc`](program/STM32G431_FOC.ioc)，下载器 CMSIS-DAP。
 

@@ -33,3 +33,11 @@ Debug/
 Release/
 build/
 Build/
+
+# Desktop controller runtime and generated outputs
+.venv/
+__pycache__/
+.pytest_cache/
+host_app/dist/
+host_app/captures/
+host_app/build*.log

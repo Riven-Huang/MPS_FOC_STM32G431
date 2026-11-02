@@ -9,6 +9,7 @@
 #include "ma600a.h"
 #include "main.h"
 #include "motor.h"
+#include "fault_record.h"
 #include "units.h"
 
 /* ============================================================================
@@ -35,6 +36,8 @@ static float    s_spd_win_start_rad;    /* 测速窗口起点连续角 */
 static uint32_t s_spd_win_cnt;          /* 测速窗口内样本计数 */
 static float    s_spd_raw_rad_s;        /* 窗口差分原始速度 */
 static float    s_spd_dt_s;             /* 速度环实际周期 */
+static filter_lpf_f32_t s_id_lpf, s_iq_lpf; /* Park 后滤波，保留未滤波相电流用于保护 */
+static float s_cur_lpf_hz_cache;
 static filter_lpf_f32_t s_spd_lpf;      /* 测速低通 */
 static float    s_spd_lpf_hz_cache;     /* 测速 LPF 系数缓存对应的截止频率 */
 static float    s_spd_dt_cache_s;       /* 测速 LPF 系数缓存对应的窗口周期 */
@@ -166,6 +169,8 @@ static float ctrl_pi(float ref, float fb, float kp, float ki, float dt_s,
 
 static void ctrl_reset_cur_loop(void)
 {
+    s_id_lpf.initialized = 0U;
+    s_iq_lpf.initialized = 0U;
     s_id_ref_tgt_a = 0.0f;
     s_iq_ref_tgt_a = 0.0f;
     s_id_ref_a = 0.0f;
@@ -483,6 +488,8 @@ static void ctrl_current_feedback(uint16_t ia_raw, uint16_t ib_raw, uint16_t ic_
     float ic;
 
     if (g_fb.offset_ready == 0U) {
+        s_id_lpf.initialized = 0U;
+        s_iq_lpf.initialized = 0U;
         g_fb.ia_a = 0.0f;
         g_fb.ib_a = 0.0f;
         g_fb.ic_a = 0.0f;
@@ -502,6 +509,8 @@ static void ctrl_current_feedback(uint16_t ia_raw, uint16_t ib_raw, uint16_t ic_
     g_fb.i_sum_a = ia + ib + ic;
 
     if (board_power_enabled() == 0U) {
+        s_id_lpf.initialized = 0U;
+        s_iq_lpf.initialized = 0U;
         g_fb.id_a = 0.0f;
         g_fb.iq_a = 0.0f;
         return;
@@ -509,8 +518,16 @@ static void ctrl_current_feedback(uint16_t ia_raw, uint16_t ib_raw, uint16_t ic_
 
     foc_core_clarke(ia, ib, &i_ab);
     foc_core_park(&i_ab, g_foc.sin_theta, g_foc.cos_theta, &i_dq);
-    g_fb.id_a = i_dq.d;
-    g_fb.iq_a = i_dq.q;
+    if (g_cmd.cur_lpf_hz != s_cur_lpf_hz_cache) {
+        s_id_lpf.alpha = ctrl_lpf_alpha(g_cmd.cur_lpf_hz, CFG_FAST_DT_S);
+        s_iq_lpf.alpha = s_id_lpf.alpha;
+        s_cur_lpf_hz_cache = g_cmd.cur_lpf_hz;
+        s_id_lpf.initialized = 0U;
+        s_iq_lpf.initialized = 0U;
+    }
+    /* 首拍跟随输入，避免启动或参数切换时混入旧状态。 */
+    g_fb.id_a = filter_lpf_f32_update(&s_id_lpf, i_dq.d);
+    g_fb.iq_a = filter_lpf_f32_update(&s_iq_lpf, i_dq.q);
 }
 
 /* ================================ 三环 ================================ */
@@ -882,9 +899,9 @@ static uint16_t ctrl_check_fast_faults(void)
     }
 
     if (g_fb.offset_ready != 0U) {
-        if ((fabsf(g_fb.ia_a) > CFG_PROT_PHASE_OC_A) ||
-            (fabsf(g_fb.ib_a) > CFG_PROT_PHASE_OC_A) ||
-            (fabsf(g_fb.ic_a) > CFG_PROT_PHASE_OC_A)) {
+        if ((fabsf(g_fb.ia_a) > g_cmd.prot_oc_a) ||
+            (fabsf(g_fb.ib_a) > g_cmd.prot_oc_a) ||
+            (fabsf(g_fb.ic_a) > g_cmd.prot_oc_a)) {
             bits |= FAULT_BIT_OVERCURRENT;
         }
     }
@@ -918,9 +935,9 @@ static void ctrl_slow_tasks(uint16_t vbus_raw, uint16_t ntc_raw)
 
     /* 慢速保护：母线过压始终锁存；欠压只在非待机时锁存，
      * 避免只上逻辑电、不上母线电的调试场景卡在 FAULT */
-    if (vbus > CFG_PROT_VBUS_OV_V) {
+    if (vbus > g_cmd.prot_ov_v) {
         g_fb.fault_bits |= FAULT_BIT_OVERVOLT;
-    } else if ((vbus < CFG_PROT_VBUS_UV_V) && (s_state != MOTOR_STATE_IDLE)) {
+    } else if ((vbus < g_cmd.prot_uv_v) && (s_state != MOTOR_STATE_IDLE)) {
         g_fb.fault_bits |= FAULT_BIT_UNDERVOLT;
     }
 
@@ -959,6 +976,9 @@ void ctrl_init(void)
     g_cmd.spd_rpm = CFG_SPD_RPM_DEFAULT;
     g_cmd.pos_deg = 0.0f;
     g_cmd.iq_lim_a = CFG_IQ_LIM_A_DEFAULT;
+    g_cmd.prot_oc_a = CFG_PROT_PHASE_OC_A;
+    g_cmd.prot_ov_v = CFG_PROT_VBUS_OV_V;
+    g_cmd.prot_uv_v = CFG_PROT_VBUS_UV_V;
     /* 三环带宽整定（公式与数值推导见 app_config.h）：
      *   电流环：Kp=2π·bw·L，Ki=2π·bw·R（模最佳）
      *   速度环：Kp=2ζ·ωn·J/Kt，Ki=ωn²·J/Kt（二阶整定），再 ÷极对数 换算到电角速度域
@@ -974,6 +994,7 @@ void ctrl_init(void)
                         CFG_MOTOR_KT_NM_A) / CFG_MOTOR_POLE_PAIRS;
         g_cmd.pos_kp = UNITS_TWO_PI * CFG_POS_BW_HZ_DEFAULT;
     }
+    g_cmd.cur_lpf_hz = CFG_CUR_LPF_HZ_DEFAULT;
     g_cmd.spd_lpf_hz = CFG_SPD_LPF_HZ_DEFAULT;
     g_cmd.pos_ki = CFG_POS_KI_DEFAULT;
     g_cmd.pos_kd = CFG_POS_KD_DEFAULT;
@@ -995,6 +1016,7 @@ void ctrl_init(void)
     s_enc_ofs_rad = 0.0f;
 
     /* 测速 LPF 缓存置无效标记，强制首个测速窗按实际周期计算系数 */
+    s_cur_lpf_hz_cache = -1.0f;
     s_spd_lpf_hz_cache = -1.0f;
     s_spd_dt_cache_s = -1.0f;
 
@@ -1036,6 +1058,7 @@ void ctrl_fast_loop(uint16_t ia_raw, uint16_t ib_raw, uint16_t ic_raw,
 {
     uint32_t t0_cycles = board_cycles();
     uint16_t new_faults;
+    uint16_t previous_faults = g_fb.fault_bits;
     uint32_t elapsed;
     float elapsed_us;
     float theta;
@@ -1088,6 +1111,10 @@ void ctrl_fast_loop(uint16_t ia_raw, uint16_t ib_raw, uint16_t ic_raw,
     new_faults = ctrl_check_fast_faults();
     if (new_faults != 0U) {
         g_fb.fault_bits |= new_faults;
+    }
+    if ((g_fb.fault_bits & ~previous_faults) != 0U) {
+        motor_capture_fault(&g_fb, &g_cmd, (uint16_t)(g_fb.fault_bits & ~previous_faults),
+                            HAL_GetTick(), board_vbus_v(vbus_raw), vbus_raw);
     }
     if ((g_fb.fault_bits != 0U) && (s_state != MOTOR_STATE_FAULT)) {
         ctrl_enter_fault();

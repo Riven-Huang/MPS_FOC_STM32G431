@@ -8,6 +8,8 @@
 
 ## 1. 控制接口与调试方法
 
+也可使用 [MPS FOC Studio 串口上位机](../host_app/README.md) 完成带宽调参、模式切换、目标下发和波形记录。首次需烧录配套固件；连接后读取参数，手动下发与启动。
+
 全部交互只通过两个全局结构体（定义在 [`program/App/motor.h`](../program/App/motor.h)）：
 
 - 写 `g_cmd` — 模式 `mode`、总开关 `run`、清故障 `clear_fault`、各模式目标值与调参量

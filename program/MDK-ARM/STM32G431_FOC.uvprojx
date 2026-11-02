@@ -519,6 +519,11 @@
               <FilePath>../App/filter.c</FilePath>
             </File>
             <File>
+              <FileName>host_link.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>../App/host_link.c</FilePath>
+            </File>
+            <File>
               <FileName>cli_uart.c</FileName>
               <FileType>1</FileType>
               <FilePath>../App/cli_uart.c</FilePath>

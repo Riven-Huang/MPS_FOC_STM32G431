@@ -75,11 +75,15 @@ typedef struct
     uint8_t  pos_hold_en;       /* 位置保持/爬行开关：1=启用（默认）；0=旁路（诊断抖动来源用） */
 
     /* --- 调参量（上电默认值见 app_config.h） --- */
+    float prot_oc_a;            /* Software phase overcurrent threshold, A */
+    float prot_ov_v;            /* DC bus overvoltage threshold, V */
+    float prot_uv_v;            /* DC bus undervoltage threshold, V */
     float iq_lim_a;             /* 电流限幅 A（速度环输出限幅、电流给定限幅共用） */
     float cur_kp;               /* 电流环 PI */
     float cur_ki;
     float spd_kp;               /* 速度环 PI */
     float spd_ki;
+    float cur_lpf_hz;           /* dq 电流反馈低通 Hz，0=旁路 */
     float spd_lpf_hz;           /* 测速低通截止频率 */
     float pos_kp;               /* 位置环 P */
     float pos_ki;               /* 位置环 I（建议保持 0） */
@@ -87,12 +91,26 @@ typedef struct
     float pos_spd_lim_rad_s;    /* 位置环输出（输出轴角速度）限幅 */
 } motor_cmd_t;
 
+#define MOTOR_FAULT_HISTORY_SIZE 8U
+typedef struct {
+    uint32_t seq;
+    uint32_t time_ms;
+    uint16_t bits;
+    uint16_t vbus_raw;
+    float vbus_v;
+    float vbus_unfiltered_v;
+    float ia_a, ib_a, ic_a;
+    float oc_a, ov_v, uv_v;
+} motor_fault_record_t;
+
 /* ---------------------------- 反馈结构体（用户只读） ---------------------------- */
 typedef struct
 {
     /* --- 状态 --- */
     motor_state_id_t state;     /* 状态机当前状态 */
     motor_mode_t mode_active;   /* 实际生效的模式（IDLE 时为 DISABLED） */
+    uint32_t fault_event_seq;
+    motor_fault_record_t fault_history[MOTOR_FAULT_HISTORY_SIZE];
     uint16_t fault_bits;        /* 故障位掩码，见 FAULT_BIT_* */
     uint8_t  align_done;        /* 编码器零位对齐完成 */
     uint8_t  offset_ready;      /* 电流零偏校准完成 */
@@ -112,7 +130,7 @@ typedef struct
     float ib_a;
     float ic_a;
     float i_sum_a;              /* ia+ib+ic，正常应接近 0 */
-    float id_a;                 /* 旋转坐标系 d 轴电流 */
+    float id_a;                 /* 低通后的旋转坐标系 d 轴电流（PI/遥测共用） */
     float iq_a;                 /* 旋转坐标系 q 轴电流 */
     float id_ref_a;             /* 实际送入 PI 的电流给定（限幅后） */
     float iq_ref_a;
