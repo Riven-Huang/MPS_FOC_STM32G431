@@ -22,7 +22,7 @@
 - [4. 软件结构](#sec-4)
 - [5. 控制接口](#sec-5)
 - [6. 控制链路实现](#sec-6)
-- [7. 测试结果](#sec-7)
+- [7. 测试](#sec-7)
 - [8. 上电调试](#sec-8)
 - [9. 新电机适配](#sec-9)
 - [10. 已知限制](#sec-10)
@@ -103,7 +103,7 @@
 
 ## 3. 板级接口
 
-### 3.1 功率接口与引脚映射
+### 3.1 功率接口
 
 电源与 UVW 三相出线端位于板边。若上电后电机无法正常运转，优先核对编码器正方向与三相相序是否一致：可将 `CFG_ENC_DIR_SIGN` 取反，或对调任意两根相线。
 
@@ -111,17 +111,7 @@
   <img src="figure/电源接口图.png" alt="电源接口图" width="360">
 </p>
 
-引脚映射以 V1.3 硬件和 CubeMX 配置为准，来源为 `program/Core/Src/` 下的 `tim.c`、`adc.c`、`spi.c`、`usart.c`、`gpio.c`：
-
-- 三相 PWM：`TIM1_CH1/2/3 + CH1N/2N/3N` → `PA8/PA9/PA10` + `PC13/PB0/PB1`，六路互补，接 `MP6539B`
-- 三相电流采样：`ADC1_IN1 / IN3 / IN4` → `PA0 / PA2 / PA3`，注入组与 PWM 同步
-- 母线电压采样：`ADC2_IN12` → `PB2`，由 `ADC2 + DMA` 周期采样
-- NTC 温度采样：`ADC2_IN14` → `PB11`
-- 编码器：`SPI1 + ENC_CS` → `PA5 / PA6 / PA7` + `PA4`，对接 `MA600A`
-- 功率级使能：`N_SLEEP` → `PB14`，`1 = 使能`，`0 = 关断`
-- 驱动故障输入：`N_FAULT` → `PB15`，上拉输入，低有效
-- 调试串口：`USART1` → `PB6 / PB7`，`115200 8N1`
-- 预留通信口：`FDCAN1` → `PA11 / PA12`，仅完成 CubeMX 初始化
+引脚分配看 V1.3 原理图，外设配置以 CubeMX 工程 [`program/STM32G431_FOC.ioc`](program/STM32G431_FOC.ioc) 为准。软件里只用两个极性别弄反：`N_SLEEP`（`PB14`）高电平使能功率级，`N_FAULT`（`PB15`）低有效。
 
 板载通讯接口按丝印连接。
 
@@ -129,11 +119,11 @@
   <img src="figure/poster.png" alt="板载接口丝印" width="360">
 </p>
 
-### 3.2 通信外设配置
+### 3.2 通信外设
 
 - `SPI1` — 主机、16 bit、`CPOL=1`、`CPHA=2EDGE`、软 NSS、分频 8，专用 `MA600A` 角度读取
-- `USART1` — `115200 8N1`、TX DMA、RX 中断。上电默认输出 5 路 VOFA JustFloat；连接本项目上位机后切换到带 CRC、回执和状态回读的 FOC Serial v1 协议
-- `FDCAN1` — 保留 CubeMX 默认初始化参数，未作为稳定外部接口开放
+- `USART1` — `115200 8N1`、TX DMA、RX 中断。上电默认输出 5 路 VOFA JustFloat；连接本项目上位机后切换到带 CRC、回执和状态回读的 FOC Serial v4 协议
+- `FDCAN1` — 保留 CubeMX 默认初始化参数
 - `TIM6 + ADC2 DMA` — `1 kHz`，触发母线电压/NTC 采样并驱动 1 ms 系统节拍
 
 ---
@@ -148,20 +138,20 @@
   <img src="figure/代码结构图.png" alt="代码结构图" width="900">
 </p>
 
-- `program/Core/` — HAL 初始化、中断向量、CubeMX 外设配置
-- `program/App/program.c` — 胶水层：初始化、后台遥测、HAL 回调转发
-- `program/App/motor_ctrl.c` — 控制核心：状态机、保护、对齐、观测器、三环、模式分发
-- `program/App/motor.h` — 对外接口 `g_cmd` / `g_fb`，以及模式与故障枚举
-- `program/App/app_config.h` — 全部参数的唯一出处：电机、机构、板级采样链、默认增益、保护阈值
-- `program/App/board.c` — 板级抽象：ADC 换算、NTC、GPIO、TIM1 占空比、DWT 计时
-- `program/App/units.h` — 角度包绕、单位换算、坐标系变换，全部 `static inline`
-- `program/App/foc_core.c` — Clarke / Park / 反 Park / SVPWM，缓存 `sin/cos`
-- `program/App/ma600a.c` — MA600A SPI 驱动：非阻塞读角、跳变剔除、通讯错误统计
-- `program/App/filter.c` — 一阶低通滤波器
-- `program/App/cli_uart.c` — UART DMA 发送与接收环形缓冲
-- `program/App/host_link.c` — 上位机协议、参数校验、带宽到 PI 换算及远程运行超时停机
+`program/Core/` 是 HAL 初始化、中断向量与 CubeMX 外设配置，业务代码全在 `program/App/`：
 
-### 4.2 执行上下文与频率
+| 文件 | 职责 |
+| --- | --- |
+| `motor_ctrl.c` | 控制核心：状态机、保护、对齐、观测器、三环、模式分发 |
+| `foc_core.c` | Clarke / Park / 反 Park / SVPWM，缓存 `sin/cos` |
+| `board.c` | 板级抽象：ADC 换算、NTC、GPIO、TIM1 占空比、DWT 计时 |
+| `ma600a.c` | MA600A SPI 驱动：非阻塞读角、跳变剔除、通讯错误统计 |
+| `host_link.c` | 上位机协议、参数校验、带宽到 PI 换算、远程运行超时停机 |
+| `cli_uart.c` | UART DMA 发送与接收环形缓冲 |
+| `motor.h` · `app_config.h` | 对外接口 `g_cmd` / `g_fb` 与模式故障枚举；全部参数的唯一出处 |
+| `units.h` · `filter.c` · `program.c` | 角度包绕与坐标系变换、一阶低通、胶水层（初始化与后台遥测） |
+
+### 4.2 执行频率
 
 全部控制、保护与慢速采样都在 `ADC1` 注入组完成中断这一个上下文内执行，慢任务按 `CFG_SLOW_DIV` 分频，`g_fb` 的读写不存在跨上下文竞态。
 
@@ -188,19 +178,7 @@ extern volatile motor_fb_t  g_fb;    /* 用户读：状态、故障、全部测�
 
 ### 5.1 命令接口 `g_cmd`
 
-完整字段定义见 `motor.h`，调参常用项如下。操作顺序固定为**先设 `mode` 和目标值，最后置 `run = 1`**。
-
-- `mode` — 工作模式，见 5.2
-- `run` — 总运行开关，置 `1` 后按 `mode` 启动
-- `iq_lim_a` — 电流限幅，同时限制电流给定和速度环输出
-- `iq_a` — `CURRENT` 模式 q 轴电流目标
-- `spd_rpm` — `SPEED` 模式转子侧转速目标
-- `pos_deg` — `POSITION` 模式输出轴角度目标，`0~360`
-- `cur_kp` `cur_ki` — 电流环 PI
-- `spd_kp` `spd_ki` — 速度环 PI
-- `spd_lpf_hz` — 测速低通截止频率
-- `pos_kp` `pos_ki` `pos_kd` — 位置环参数，`kd` 为测速阻尼
-- `pos_spd_lim_rad_s` — 位置环输出速度限幅
+完整字段定义见 `motor.h`，操作顺序固定为**先设 `mode` 和目标值，最后置 `run = 1`**。常用项是 `mode`、`run`、`iq_lim_a`（同时限制电流给定和速度环输出）、三个模式目标 `iq_a` / `spd_rpm` / `pos_deg`，以及三环参数 `cur_kp` `cur_ki`、`spd_kp` `spd_ki`、`pos_kp` `pos_ki` `pos_kd` 和 `spd_lpf_hz`、`pos_spd_lim_rad_s`。
 
 电压模式的 `ud_v` / `uq_v`、`PWM_TEST` 的占空比、`clear_fault` 等操作项见 [`docs/quick-start.md`](docs/quick-start.md)。
 
@@ -217,15 +195,19 @@ extern volatile motor_fb_t  g_fb;    /* 用户读：状态、故障、全部测�
 
 ### 5.3 反馈接口 `g_fb`
 
-- 状态 — `state` `mode_active` `fault_bits` `align_done` `offset_ready` `enc_valid` `drv_fault`
-- 电流 — `ia_a` `ib_a` `ic_a` `i_sum_a` `id_a` `iq_a` `id_ref_a` `iq_ref_a`
-- 角度与位置 — `theta_elec_rad` `enc_deg` `align_ofs_rad` `pos_out_deg` `pos_ref_deg`
-- 速度 — `spd_rot_rpm` `spd_out_rpm` `spd_ref_rpm`
-- 电压与温度 — `vbus_v` `ntc_c` `ud_v` `uq_v` `volt_lim_v`
-- 占空比与实时性 — `duty_a` `duty_b` `duty_c` `loop_us` `loop_us_max` `overrun_cnt`
-- 编码器统计 — `enc_samples` `enc_reject` `enc_err`
+字段按状态、电流、角度与位置、速度、电压与温度、占空比与实时性、编码器统计七组组织，命名与 `motor.h` 一致。上位机右侧「实时数据」栏和 5 路 VOFA 波形取的就是其中常用项。
 
-故障位掩码：`FAULT_BIT_DRIVER`（`0x01`，`N_FAULT`）、`FAULT_BIT_OVERCURRENT`（`0x02`）、`FAULT_BIT_OVERVOLT`（`0x04`）、`FAULT_BIT_UNDERVOLT`（`0x08`）、`FAULT_BIT_ENCODER`（`0x10`）。
+`fault_bits` 的位定义：
+
+| 位                       | 掩码     | 含义    |
+| ----------------------- | ------ | ----- |
+| `FAULT_BIT_DRIVER`      | `0x01` | 驱动故障  |
+| `FAULT_BIT_OVERCURRENT` | `0x02` | 过流    |
+| `FAULT_BIT_OVERVOLT`    | `0x04` | 过压    |
+| `FAULT_BIT_UNDERVOLT`   | `0x08` | 欠压    |
+| `FAULT_BIT_ENCODER`     | `0x10` | 编码器失效 |
+
+前两项与编码器位在快环 `10 kHz` 判定，母线两项在慢任务 `1 kHz` 锁存。任一位置位即进 FAULT 并关断功率级；置 `g_cmd.clear_fault = 1` 会同时清 `run`，仅当 `N_FAULT` 已释放时才清掉掩码回到 IDLE，否则保持锁存。
 
 ---
 
@@ -235,20 +217,26 @@ extern volatile motor_fb_t  g_fb;    /* 用户读：状态、故障、全部测�
 
 ### 6.1 从电流采样到 PWM 更新
 
-`TIM1` 以中心对齐方式输出六路互补 PWM，并通过 `TRGO2 = UPDATE` 触发 `ADC1` 注入组。每拍快环的执行顺序为：
+`TIM1` 以中心对齐方式输出六路互补 PWM，并通过 `TRGO2 = UPDATE` 触发 `ADC1` 注入组。每拍快环的执行流程：
 
-1. 登记三相电流原始码值；未完成零偏校准时继续累计样本。
-2. 发起下一次编码器 SPI 读角，并消费已完成样本，更新机械角、连续角与测速窗口。
-3. 计算本拍电角度（快环唯一计算点），写入 `foc_core` 的 `sin/cos` 缓存。
-4. 原始码值扣除零偏后换算为安培值，执行 Clarke / Park 得到 `id`、`iq`。
-5. 按 `CFG_SLOW_DIV` 分频执行慢任务。
-6. 汇聚快环与慢任务产生的故障位，必要时进入 FAULT 锁存。
-7. 处理故障清除请求。
-8. 按状态机执行 IDLE / ALIGN / RUN / FAULT 分支，RUN 分支内分发到当前模式。
-9. 反 Park 后经 SVPWM 得到三相占空比，写入 `TIM1->CCR1/2/3`，并回写 `g_fb` 状态镜像。
-10. 用 DWT 周期计数统计本次快环耗时，超时则累加 `overrun_cnt`。
+```text
+Algorithm 1  快环（ADC1 注入组完成中断，10 kHz）
+ 1: 登记三相电流原始码值；零偏未完成时继续累计样本
+ 2: 发起下次编码器 SPI 读角，消费已完成样本，更新机械角、连续角与测速窗
+ 3: 计算本拍电角度（快环唯一计算点），写入 sin/cos 缓存
+ 4: 扣零偏并换算为安培，Clarke / Park 得到 id、iq
+ 5: if 慢任务分频到点 then
+ 6:     母线 / NTC 换算，过压欠压锁存
+ 7: end if
+ 8: 汇聚快环与慢任务故障位
+ 9: if 故障位置位 then state ← FAULT，关闭功率级
+10: if g_cmd.clear_fault then 清故障，state ← IDLE
+11: 按 state 分支：IDLE / ALIGN / RUN / FAULT；RUN 内按 mode 分发到三环
+12: 反 Park → SVPWM → 写入 TIM1->CCR1/2/3，回写 g_fb 状态镜像
+13: 用 DWT 统计本次耗时 loop_us，超时累加 overrun_cnt
+```
 
-其中第 4 步的 Clarke 与 Park 变换在三个坐标系之间依次转换：
+其中 Clarke 与 Park 变换在三个坐标系之间依次转换：
 
 | 三相静止坐标系 abc                   | 两相静止坐标系 αβ                   | 两相旋转坐标系 dq                   |
 | ----------------------------- | ---------------------------- | ---------------------------- |
@@ -259,7 +247,7 @@ extern volatile motor_fb_t  g_fb;    /* 用户读：状态、故障、全部测�
 
 三相电流经分流电阻和固定增益放大后送入 `ADC1` 注入组，由 `TIM1 TRGO2` 触发，与 PWM 同步采样。上电后累计 `CFG_OFFSET_SAMPLES = 1024` 个样本（约 100 ms）求每相零偏，置位 `g_fb.offset_ready`。
 
-换算关系为 `i = (raw - raw_offset) × Vref / 4095 / (G × Rshunt)`，当前采样链为 `Rshunt = 8 mΩ`、`G = 20`，对应 `0.16 V/A`，满量程约 `±10.3 A`。相电流极性由 `CFG_CUR_SIGN_IA/IB/IC` 逐个配置，某相方向相反时取 `-1`。
+换算关系为 `i = (raw - raw_offset) × Vref / 4095 / (G × Rshunt)`，当前采样链为 `Rshunt = 4 mΩ`、`G = 20`，对应 `0.08 V/A`，满量程约 `±20.6 A`，软件限幅 `16 A`。相电流极性由 `CFG_CUR_SIGN_IA/IB/IC` 逐个配置，某相方向相反时取 `-1`。
 
 ### 6.3 编码器角度观测与零位对齐
 
@@ -271,21 +259,21 @@ extern volatile motor_fb_t  g_fb;    /* 用户读：状态、故障、全部测�
 
 ### 6.4 三环结构与参数整定
 
-三个环路的带宽在 [`program/App/app_config.h`](program/App/app_config.h) 中独立配置，PI 增益在上电时按带宽自动计算。
+三个环路的带宽在 [`program/App/app_config.h`](program/App/app_config.h) 中独立配置，PI 增益上电时按带宽自动计算，整定公式写在同文件注释里。
 
 <p align="center">
   <img src="figure/三环控制图.png" alt="三环控制结构" width="900">
 </p>
 
-- 电流环 — `10 kHz`，对象为等效 R/L 串联，按模最佳整定 `Kp = 2π·f_bw·L_eq`、`Ki = 2π·f_bw·R_eq`，默认 `500 Hz` 对应 `cur_kp = 1.288`、`cur_ki = 2277.65`
-- 速度环 — 名义 `2 kHz`，对象为 `Kt/J` 积分，按二阶整定 `ωn = 2π·f_bw`、`ζ = 1`，结果除以极对数换算到电角速度域，默认 `30 Hz` 对应 `spd_kp = 0.01346`、`spd_ki = 1.26895`
-- 位置环 — `200 Hz`，对象近似纯积分 `1/s`，`Kp = 2π·f_bw`，默认 `5 Hz` 对应 `pos_kp = 31.42`、`pos_ki = 0`、`pos_kd = 0.3`
+- 电流环 — `10 kHz`，对象为等效 R/L 串联，默认 `250 Hz`
+- 速度环 — 名义 `2 kHz`，对象为 `Kt/J` 积分，默认 `10 Hz`
+- 位置环 — `200 Hz`，对象近似纯积分，默认 `2 Hz`
 
 电流环带宽受 PWM 更新率限制：当前更新率为 `5 kHz`，`500 Hz` 时相位裕度约 `45°`，接近 `800 Hz` 时只剩约 `18°`，会出现振铃并可能触发过流保护。需要更高带宽时应先在 CubeMX 中减小 `TIM1` 的 `RCR` 以提高更新率。
 
-速度反馈链的等效延迟约 `1.1 ms`，由 SPI 样本龄、5 点测速窗群延迟、`300 Hz` 测速低通和 `2 kHz` 零阶保持组成，对应速度环带宽上限约 `60 Hz`。`CFG_MOTOR_INERTIA_KGM2` 为估计值，是速度环增益的实际旋钮：振荡时减小，响应过软时增大。
+速度反馈链的等效延迟约 `1.6 ms`，由 SPI 样本龄、5 点测速窗群延迟、`150 Hz` 测速低通和 `2 kHz` 零阶保持组成，对应速度环带宽上限约 `40 Hz`，默认 `10 Hz` 留了约 4 倍余量。`CFG_MOTOR_INERTIA_KGM2` 为估计值，是速度环增益的实际旋钮：振荡时减小，响应过软时增大。
 
-`g_cmd.iq_lim_a` 同时限制电流给定和速度环输出，默认 `5 A`，过流保护阈值为 `CFG_PROT_PHASE_OC_A = 10 A`，为瞬态超调保留余量。
+`g_cmd.iq_lim_a` 同时限制电流给定和速度环输出，默认 `16 A`，与过流阈值 `CFG_PROT_PHASE_OC_A` 相同，满限幅运行需留意超调。
 
 ### 6.5 保护、状态机与遥测
 
@@ -297,9 +285,9 @@ extern volatile motor_fb_t  g_fb;    /* 用户读：状态、故障、全部测�
 
 <a id="sec-7"></a>
 
-## 7. 测试结果
+## 7. 测试
 
-### 7.1 验收项目
+### 7.1 测试项目
 
 - 电源输入范围 — 标准 `48 V ±15%`，40~56 V 范围内正常运行
 - 启停性能 — 标准为空载启动平稳无振动，见验收视频
@@ -310,7 +298,7 @@ extern volatile motor_fb_t  g_fb;    /* 用户读：状态、故障、全部测�
 
 验收视频见 [STM32-MPS-FOC电机全流程测试](https://www.bilibili.com/video/BV1HWXkBHEVS/)，流体负载补充测试见 [30mins 流体负载测试](https://www.bilibili.com/video/BV1bgvYBtEYp/)。
 
-### 7.2 对拖测试平台
+### 7.2 测试平台
 
 双电机对拖平台左侧为驱动电机，右侧为发电机，整流后接入电子负载或实验台架。
 
@@ -332,10 +320,11 @@ extern volatile motor_fb_t  g_fb;    /* 用户读：状态、故障、全部测�
 
 ### 7.4 带载温升
 
-| 带载 2 min 热像                   | 带载 20 min 热像                  |
-| ----------------------------- | ----------------------------- |
-| ![](figure/带载测试2mins.jpg)     | ![](figure/带载测试20mins.png)    |
-| 中心温度约 `35.4 °C`，最高约 `61.8 °C` | 壳温约 `74.6 °C`，最高热点约 `82.6 °C` |
+<p align="center">
+  <img src="figure/带载测试8mins.png" alt="带载温升热像" width="380">
+</p>
+
+带载 8 min 后壳温约 `74.6 °C`，最高热点约 `82.6 °C`；带载 2 min 时中心温度约 `35.4 °C`、最高约 `61.8 °C`。
 
 ---
 
@@ -343,55 +332,51 @@ extern volatile motor_fb_t  g_fb;    /* 用户读：状态、故障、全部测�
 
 ## 8. 上电调试
 
-完整的上电自检与三环整定步骤见 [`docs/quick-start.md`](docs/quick-start.md)，这里只列关键顺序与判据。
+整定全程用串口上位机完成，本节只讲操作步骤，判据与异常定位见 [`docs/quick-start.md`](docs/quick-start.md)。
 
-当前程序的故障触发条件、清除流程、三环小步进测试及新版 VOFA 通道见 [`program 调试说明`](docs/program-debug.md)。
+### 8.1 连接与界面
 
-串口上位机见 [`host_app/README.md`](host_app/README.md)：通过带宽调参并显示实际 PI，按模式开放目标输入，显示 5 路实时波形并支持 CSV 导出。先烧录配套固件再连接；参数只写 RAM，复位恢复编译默认值。
+1. 调试器接控制板调试口，同时把 USB 串口接到板载 `USART1`。
+2. Keil 编译并烧录固件。
+3. 关掉 VOFA 等占用串口的程序，打开上位机，选对应串口，点「连接控制板」。
 
-开发环境为 Keil MDK，工程文件 [`program/MDK-ARM/STM32G431_FOC.uvprojx`](program/MDK-ARM/STM32G431_FOC.uvprojx)，CubeMX 工程 [`program/STM32G431_FOC.ioc`](program/STM32G431_FOC.ioc)，下载器 CMSIS-DAP。
+<p align="center">
+  <img src="host_app/ov80-exe-preview.png" alt="MPS FOC Studio 主界面" width="820">
+</p>
 
-### 8.1 上电自检
+左上「协议与连接」选串口、连控制板，左下「模式与运行」设模式与目标，中间实时波形，右侧实时数据。
 
-程序上电后自动完成 `ADC1`/`ADC2` 校准、启动 `TIM1` 并保持 50% 占空比、累计三相电流零偏、启动 `ADC2 + DMA` 采样母线电压与 NTC、读取一次 MA600A 角度。保持 `g_cmd.run = 0`，确认：
+改完参数点「下发参数」，回读正确后再点「启动已下发模式」，电机运行。
 
-- `g_fb.offset_ready` 上电约 100 ms 后置 `1`
-- `g_fb.ia_a` / `ib_a` / `ic_a` 静止时接近 `0 A`，`g_fb.i_sum_a` 接近 `0`
-- `g_fb.vbus_v` 与实际母线电压同量级
-- `g_fb.enc_deg` 手动转动时连续变化，`g_fb.drv_fault` 与 `g_fb.fault_bits` 为 `0`
-- `g_fb.loop_us` 稳定小于 `100 us`，`overrun_cnt` 不增长
+参数写 RAM，复位恢复 `app_config.h` 编译默认值；STOP 只清 `run`，模式与参数保留；远程启动后 `2 s` 无有效指令，固件自行撤销运行。
 
-### 8.2 发波与开环验证
+### 8.2 上电自检与采样
 
-验证功率级发波链路时断开电机：
+上电后固件自动完成 `ADC1`/`ADC2` 校准、`TIM1` 以 50% 占空比起振、累计三相电流零偏、启动 `ADC2 + DMA` 采样母线电压与 NTC、读取一次 MA600A 角度。
 
-```c
-g_cmd.mode = MOTOR_MODE_PWM_TEST;
-g_cmd.duty_a = 0.30f;
-g_cmd.duty_b = 0.40f;
-g_cmd.duty_c = 0.60f;   /* 三相不相等，便于示波器辨认 */
-g_cmd.run = 1;
-```
+每次进入控制模式都会自动重做一次电流零偏，母线电压与 NTC 采样同理。MA600A 单独验证：面朝电机出轴端，逆时针转一周，机械角度应正增长。
 
-确认 `PA8/PA9/PA10` 与 `PC13/PB0/PB1` 输出 `20 kHz` 互补 PWM 后退出该模式，改用开环电压模式确认出力方向：
+### 8.3 发波与开环验证
 
-```c
-g_cmd.mode = MOTOR_MODE_VOLTAGE;
-g_cmd.volt_open_angle_en = 1;          /* 开环积分角度，跳过对齐 */
-g_cmd.open_spd_elec_rad_s = 200.0f;    /* 电角速度 ≈ 136 rpm 转子 */
-g_cmd.uq_v = 0.5f;
-g_cmd.run = 1;
-```
+先断开电机验证功率级：模式选 `PWM TEST`，三相给不一致的占空比（如 `0.30` / `0.40` / `0.60`），示波器依次看 MCU 六路输出、`MP6539B` 栅极、相线开关波形，确认互补正常、无直通。
 
-`volt_open_angle_en = 0` 时使用编码器闭环角度，启动前会自动执行 6.3 所述的零位对齐。
+<p align="center">
+  <img src="video/dso_30dlpgb105.png" alt="相线 PWM 波形" width="460">
+</p>
 
-### 8.3 闭环调试顺序
+单路相线开关波形，`500 mV/div`、`20 us/div`。六路两两互补、中间留死区；三相占空比不同，示波器上才能分清是哪一相。
+
+再确正方向：模式选 `VOLTAGE`，换相角度先选开环积分电角度，给定 q 轴电压，确认能转起来、且面朝出轴端为逆时针；方向反了就任意对调两根相线。然后把换相角度切成 MA600A 换算的电角度重复一次，此时启动前会先执行 §6.3 的零位对齐。
+
+### 8.4 三环调试顺序
 
 由内到外依次闭合，每一步确认稳定后再进入下一步：
 
-- 电流环 — `MOTOR_MODE_CURRENT`，`id_a = 0`、`iq_a = 0.1~0.3 A`、`iq_lim_a = 1 A`，观察 `id_a` `iq_a` `ud_v` `uq_v` `volt_lim_v`
-- 速度环 — `MOTOR_MODE_SPEED`，`spd_rpm = 20`、`iq_lim_a = 1 A`，观察 `spd_ref_rpm` `spd_rot_rpm` `spd_out_rpm` `iq_ref_a`
-- 位置环 — `MOTOR_MODE_POSITION`，`pos_spd_lim_rad_s = 8`，观察 `pos_ref_deg` `pos_out_deg`
+- 电流环 — `CURRENT` 模式，`id` 给 `0`、`iq` 给 `0.1~0.3 A`、限幅 `1 A`；手握手摇曲柄做堵转，看跟踪效果与出力大小
+- 速度环 — 拆掉曲柄，`SPEED` 模式给 `20 rpm` 左右的转速阶跃，看响应速度、超调与稳态误差
+- 位置环 — `POSITION` 模式给目标角度，看跟踪精度；可装回曲柄用力拖动，做对抗测试
+
+带载与温升测试见 §7.4；保护阈值在「限幅」页设置，且只能在待机状态修改。
 
 ---
 
@@ -399,11 +384,21 @@ g_cmd.run = 1;
 
 ## 9. 新电机适配
 
-适配前需确认极对数、减速比、编码器安装侧与方向，以及相电阻、相电感、扭矩常数、额定/峰值电流和母线电压范围。极对数、减速比、编码器安装侧和方向任一项填错，都会使闭环从负反馈变为正反馈，表现为对齐失败、抖动、发热或无力。
+换电机本质上只是把这几个量填对：*R*、*L*、*K*<sub>t</sub>、减速比 *i*、极对数 *p*、编码器方向与相序。它们全部集中在 [`program/App/app_config.h`](program/App/app_config.h)，改完重新编译烧录，其余代码不用动。
 
-全部需要修改的参数集中在 [`program/App/app_config.h`](program/App/app_config.h) 的 `CFG_MOTOR_*`、`CFG_ENC_*`、`CFG_CUR_*` 与 `CFG_IQ_LIM_A_DEFAULT`。`CFG_CUR_EQ_R_OHM` 和 `CFG_CUR_EQ_L_H` 是当前板级在 `10 kHz` 快环下用于 PI 计算的等效对象参数，不等同于电机手册的相间电阻与电感，换电机时先用新电机参数估初值，不要直接照搬。
+| 符号 | 含义 | 对应宏 |
+| --- | --- | --- |
+| *p* | 极对数 | `CFG_MOTOR_POLE_PAIRS` |
+| *i* | 减速比，无减速器填 `1` | `CFG_MOTOR_GEAR_RATIO` |
+| *R* | 相电阻 | `CFG_CUR_EQ_R_OHM` |
+| *L* | 相电感 | `CFG_CUR_EQ_L_H` |
+| *K*<sub>t</sub> | 扭矩常数，转子侧 | `CFG_MOTOR_KT_NM_A` |
+| 编码器方向 | 正转时读数增还是减 | `CFG_ENC_DIR_SIGN` |
+| 相序 | `U/V/W` 与三相线的对应 | `CFG_CUR_SIGN_IA` / `IB` / `IC` |
 
-电流环带宽建议从 `300~500 Hz` 起步，`iq_lim_a` 先压到理论安全值的 `20%~30%`，系统稳定后再逐步提高。完整的参数辨识、限流估算与验收判据见 [`docs/适配新电机标准流程.docx`](docs/适配新电机标准流程.docx)。
+其中 *p*、*i* 与编码器方向填错，闭环会从负反馈变成正反馈，表现为对齐失败、抖动、发热；
+
+电流环带宽从 `100~200 Hz` 起步，`iq_lim_a` 先压到理论安全值的 `20%~30%`，稳定后再逐步放宽；母线电压范围用来在「限幅」页设过压/欠压阈值。完整辨识流程、限流估算与验收判据见 [`docs/适配新电机标准流程.docx`](docs/适配新电机标准流程.docx)。
 
 ---
 
@@ -413,15 +408,16 @@ g_cmd.run = 1;
 
 ### 10.1 高速运行噪声
 
-判别实验表明：开环 `VOLTAGE` 模式在相同转速下噪声更大，速度环增益减半对噪声无明显影响，说明噪声不由控制环路放大，来源在电机本体、换相角误差或减速箱。首要嫌疑是 MA600A 未做 INL 校准导致的换相角误差，其次是行星减速箱的固有机械噪声。需要注意的是，VOFA 遥测在高转速下的纹波会混叠，早期观察到的“2 倍输出轴频率波动”只能作为线索。
-
+开环 `VOLTAGE` 模式在相同转速下噪声更大，速度环增益减半对噪声无明显影响，说明噪声不由控制环路放大，来源在电机本体、换相角误差或减速箱。
+首要嫌疑是 MA600A 未做 INL 校准导致的换相角误差，其次是**行星减速箱的固有机械噪声**。
 MA600A 手册指标为校准前 `< 0.6°`、片上 32 点校准后 `< 0.1°`，当前反馈链路尚未做 INL 校准。
+MPS 官方提供了无参考编码器的恒速旋转校准方法，详见 [AN245：MA600A 校准应用笔记](https://www.monolithicpower.cn/cn/an245-calibration-of-the-ma600a?utm_source=chatgpt.com)。
 
 ### 10.2 位置环静摩擦抖动
 
-位置环在目标角度附近会出现小范围低频抖动，原因是减速箱静摩擦力与速度环积分共同作用。当前固件通过保持/爬行逻辑抑制该现象，阈值见 `app_config.h` 中的 `CFG_POS_HOLD_*` 与 `CFG_POS_CREEP_*`；诊断时可将 `g_cmd.pos_hold_en` 置 `0` 旁路该逻辑做对照。
+位置环在目标角度附近会出现小范围低频抖动，来源是减速箱静摩擦力与速度环积分的共同作用，固件用保持/爬行逻辑抑制。上位机「带宽 → PI」页可勾选旁路这套逻辑做对照；阈值在 [`program/App/app_config.h`](program/App/app_config.h) 的 `CFG_POS_HOLD_*` 与 `CFG_POS_CREEP_*` 里改，重新编译烧录后生效，上位机不下发这两组参数。
 
-速度环若出现剧烈抖动，优先检查控制板与电机的安装距离和接地，尽量使控制板贴近电机安装，并避免板背 VIN 开窗部分与电机导电件接触。
+速度环若剧烈抖动，优先检查控制板与电机的安装距离和接地：控制板尽量贴近电机，避免板背 VIN 开窗部分与电机导电件接触。
 
 ---
 

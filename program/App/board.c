@@ -18,7 +18,7 @@ void board_init(void)
 }
 
 /* 相电流：扣零偏后按 (Vref/4095) / (增益 × 分流电阻) 换算。
- * 当前链路（8mΩ || 10mΩ、增益20）：0.088888889V/A，理论量程 ±18.5625A。 */
+ * 当前链路（4mΩ、增益20）：0.08V/A，理论量程 ±20.625A。 */
 float board_current_a(uint16_t raw, uint16_t offset_raw)
 {
     float volts_per_count = CFG_ADC_REF_V / CFG_ADC_FULL_SCALE;

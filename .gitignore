@@ -41,3 +41,6 @@ __pycache__/
 host_app/dist/
 host_app/captures/
 host_app/build*.log
+
+# Local project memory
+.workbuddy/

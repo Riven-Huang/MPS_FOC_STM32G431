@@ -164,7 +164,7 @@ g_cmd.run = 1;
 
 重点观察目标 `g_cmd.spd_rpm`、斜坡后的实际给定 `g_fb.spd_ref_rpm`、转子侧测量 `g_fb.spd_rot_rpm`、输出轴测量 `g_fb.spd_out_rpm` 和电流给定 `g_fb.iq_ref_a`。
 
-调参顺序：先用较小 `spd_rpm` 确认方向，再调 `g_cmd.spd_kp`，最后增加 `g_cmd.spd_ki`。`iq_lim_a` 是速度环的主要安全夹紧量，不要一开始就放大。
+调参顺序：先用较小 `spd_rpm` 确认方向，再调 `g_cmd.spd_kp`，最后增加 `g_cmd.spd_ki`。`iq_lim_a` 是速度环的主要夹紧量。
 
 当前默认 `spd_kp = 0.01346`、`spd_ki = 1.26895`，按 `30 Hz` 带宽、`ζ = 1`、`Kt ≈ 0.60`、`J ≈ 3e-4` 整定。出现振荡时优先减小 `CFG_MOTOR_INERTIA_KGM2` 或降低 `CFG_SPD_BW_HZ_DEFAULT`，响应过软时反向调整。
 

@@ -29,9 +29,9 @@
 /* ---------------- 板级采样链 ---------------- */
 #define CFG_ADC_REF_V               3.3f
 #define CFG_ADC_FULL_SCALE          4095.0f
-#define CFG_SHUNT_OHM               (0.008f * 0.010f / (0.008f + 0.010f)) /* 每相 8 mΩ 并联 10 mΩ = 4.444444 mΩ */
+#define CFG_SHUNT_OHM               0.004f      /* 每相分流电阻 4 mΩ */
 #define CFG_CUR_GAIN                20.0f       /* 电流采样放大倍数 */
-/* 理论量程 ±18.5625A；换算 0.009065934 A/count，软件最大限流 16A。 */
+/* 理论量程 ±20.625A；换算 0.010073260 A/count，软件最大限流 16A。 */
 #define CFG_CURRENT_MAX_A          16.0f
 #define CFG_VBUS_R_UP_OHM           240000.0f   /* 母线分压上电阻 */
 #define CFG_VBUS_R_DOWN_OHM         10000.0f    /* 母线分压下电阻 */

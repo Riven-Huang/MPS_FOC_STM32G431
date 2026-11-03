@@ -130,8 +130,8 @@ int main(int argc, char **argv)
         assert(validate_config(config, &field) == RES_RANGE);
         v[0] = 0; v[1] = 0;
         memcpy(config + 4, v, sizeof(v));
-        assert(fabs(CFG_SHUNT_OHM - 0.004444444444) < 1e-9);
-        assert(fabs(CFG_ADC_REF_V / CFG_ADC_FULL_SCALE / (CFG_CUR_GAIN * CFG_SHUNT_OHM) - 0.009065934066) < 3e-9);
+        assert(fabs(CFG_SHUNT_OHM - 0.004) < 1e-9);
+        assert(fabs(CFG_ADC_REF_V / CFG_ADC_FULL_SCALE / (CFG_CUR_GAIN * CFG_SHUNT_OHM) - 0.010073260073) < 3e-9);
     }
     /* Filter changes must be finite, within range, and IDLE-only. */
     v[21] = 1000;
